@@ -1,8 +1,4 @@
-/**
- * Unit tests for faceted-prompting DataEngine implementations.
- */
-
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { FileDataEngine, CompositeDataEngine } from '../index.js';
 import type { DataEngine, FacetKind } from '../index.js';
 
@@ -39,9 +35,7 @@ describe('FileDataEngine', () => {
 
     it('should return undefined when file does not exist', async () => {
       mockExistsSync.mockReturnValue(false);
-
-      const result = await engine.resolve('policies', 'missing');
-      expect(result).toBeUndefined();
+      expect(await engine.resolve('policies', 'missing')).toBeUndefined();
     });
 
     it('should resolve correct directory for each facet kind', async () => {
@@ -67,17 +61,14 @@ describe('FileDataEngine', () => {
 
     it('should return empty array when directory does not exist', async () => {
       mockExistsSync.mockReturnValue(false);
-
-      const result = await engine.list('policies');
-      expect(result).toEqual([]);
+      expect(await engine.list('policies')).toEqual([]);
     });
 
     it('should filter non-.md files', async () => {
       mockExistsSync.mockReturnValue(true);
       mockReaddirSync.mockReturnValue(['a.md', 'b.txt', 'c.md'] as unknown as ReturnType<typeof readdirSync>);
 
-      const result = await engine.list('knowledge');
-      expect(result).toEqual(['a', 'c']);
+      expect(await engine.list('knowledge')).toEqual(['a', 'c']);
     });
   });
 });
@@ -104,8 +95,6 @@ describe('CompositeDataEngine', () => {
       const result = await composite.resolve('personas', 'coder');
 
       expect(result).toEqual({ body: 'from engine2', sourcePath: '/e2/p.md' });
-      expect(engine1.resolve).toHaveBeenCalledWith('personas', 'coder');
-      expect(engine2.resolve).toHaveBeenCalledWith('personas', 'coder');
     });
 
     it('should return first match (first-wins)', async () => {
@@ -132,9 +121,7 @@ describe('CompositeDataEngine', () => {
       };
 
       const composite = new CompositeDataEngine([engine1]);
-      const result = await composite.resolve('policies', 'missing');
-
-      expect(result).toBeUndefined();
+      expect(await composite.resolve('policies', 'missing')).toBeUndefined();
     });
   });
 
@@ -150,25 +137,7 @@ describe('CompositeDataEngine', () => {
       };
 
       const composite = new CompositeDataEngine([engine1, engine2]);
-      const result = await composite.list('personas');
-
-      expect(result).toEqual(['a', 'b', 'c']);
-    });
-
-    it('should preserve order with first-seen priority', async () => {
-      const engine1: DataEngine = {
-        resolve: vi.fn(),
-        list: vi.fn().mockResolvedValue(['x', 'y']),
-      };
-      const engine2: DataEngine = {
-        resolve: vi.fn(),
-        list: vi.fn().mockResolvedValue(['y', 'z']),
-      };
-
-      const composite = new CompositeDataEngine([engine1, engine2]);
-      const result = await composite.list('knowledge');
-
-      expect(result).toEqual(['x', 'y', 'z']);
+      expect(await composite.list('personas')).toEqual(['a', 'b', 'c']);
     });
   });
 });

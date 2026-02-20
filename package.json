@@ -1,7 +1,7 @@
 {
   "name": "faceted-prompting",
   "version": "0.1.0",
-  "description": "Faceted Prompting — compose structured LLM prompts from persona, policy, knowledge, and instruction facets",
+  "description": "Faceted Prompting — structured prompt composition for LLMs",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -16,25 +16,26 @@
   ],
   "scripts": {
     "build": "tsc",
+    "watch": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
-    "lint": "tsc --noEmit",
-    "prepublishOnly": "npm run build"
+    "lint": "eslint src/",
+    "prepublishOnly": "npm run lint && npm run build && npm run test"
   },
   "keywords": [
-    "llm",
     "prompt",
-    "faceted",
-    "prompting",
-    "ai",
-    "compose"
+    "llm",
+    "faceted-prompting",
+    "prompt-engineering",
+    "ai"
   ],
   "license": "MIT",
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18"
   },
   "devDependencies": {
     "@types/node": "^22.19.11",
+    "eslint": "^9.0.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
   }

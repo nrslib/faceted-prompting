@@ -1,9 +1,3 @@
-/**
- * Unit tests for faceted-prompting type definitions.
- *
- * Verifies that types are correctly exported and usable.
- */
-
 import { describe, it, expect } from 'vitest';
 import type {
   FacetKind,
@@ -37,9 +31,7 @@ describe('FacetContent interface', () => {
   });
 
   it('should accept body without sourcePath', () => {
-    const content: FacetContent = {
-      body: 'Inline content',
-    };
+    const content: FacetContent = { body: 'Inline content' };
     expect(content.body).toBe('Inline content');
     expect(content.sourcePath).toBeUndefined();
   });
@@ -58,9 +50,7 @@ describe('FacetSet interface', () => {
   });
 
   it('should accept a partial facet set', () => {
-    const set: FacetSet = {
-      instruction: { body: 'Do the task.' },
-    };
+    const set: FacetSet = { instruction: { body: 'Do the task.' } };
     expect(set.persona).toBeUndefined();
     expect(set.instruction?.body).toBe('Do the task.');
   });
@@ -79,9 +69,7 @@ describe('ComposedPrompt interface', () => {
 
 describe('ComposeOptions interface', () => {
   it('should hold contextMaxChars', () => {
-    const options: ComposeOptions = {
-      contextMaxChars: 2000,
-    };
+    const options: ComposeOptions = { contextMaxChars: 2000 };
     expect(options.contextMaxChars).toBe(2000);
   });
 });

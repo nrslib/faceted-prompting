@@ -4,23 +4,18 @@
  * When facet content exceeds a character limit, it is trimmed and
  * annotated with source-path metadata so the LLM can consult the
  * original file.
- *
- * This module has ZERO dependencies on TAKT internals.
  */
 
-interface PreparedContextBlock {
+interface TrimResult {
   readonly content: string;
   readonly truncated: boolean;
 }
 
-/**
- * Trim content to a maximum character length, appending a
- * "...TRUNCATED..." marker when truncation occurs.
- */
+/** Trim content to a maximum character length. */
 export function trimContextContent(
   content: string,
   maxChars: number,
-): PreparedContextBlock {
+): TrimResult {
   if (content.length <= maxChars) {
     return { content, truncated: false };
   }
@@ -30,18 +25,26 @@ export function trimContextContent(
   };
 }
 
-/**
- * Standard notice appended to knowledge and policy blocks.
- */
+/** Standard notice appended to knowledge and policy blocks. */
 export function renderConflictNotice(): string {
   return 'If prompt content conflicts with source files, source files take precedence.';
 }
 
-/**
- * Prepare a knowledge facet for inclusion in a prompt.
- *
- * Trims to maxChars, appends truncation notice and source path if available.
- */
+/** Build truncation warning lines for a given facet type. */
+function buildTruncationNotice(
+  label: string,
+  message: string,
+  sourcePath: string,
+): string[] {
+  return ['', `${label} ${message} Source: ${sourcePath}`];
+}
+
+/** Build source attribution line. */
+function buildSourceAttribution(label: string, sourcePath: string): string[] {
+  return ['', `${label} Source: ${sourcePath}`];
+}
+
+/** Prepare a knowledge facet for inclusion in a prompt. */
 export function prepareKnowledgeContent(
   content: string,
   maxChars: number,
@@ -49,24 +52,26 @@ export function prepareKnowledgeContent(
 ): string {
   const prepared = trimContextContent(content, maxChars);
   const lines: string[] = [prepared.content];
+
   if (prepared.truncated && sourcePath) {
     lines.push(
-      '',
-      `Knowledge is truncated. You MUST consult the source files before making decisions. Source: ${sourcePath}`,
+      ...buildTruncationNotice(
+        'Knowledge is truncated. You MUST consult the source files before making decisions.',
+        '',
+        sourcePath,
+      ),
     );
   }
+
   if (sourcePath) {
-    lines.push('', `Knowledge Source: ${sourcePath}`);
+    lines.push(...buildSourceAttribution('Knowledge', sourcePath));
   }
+
   lines.push('', renderConflictNotice());
   return lines.join('\n');
 }
 
-/**
- * Prepare a policy facet for inclusion in a prompt.
- *
- * Trims to maxChars, appends authoritative-source notice and source path if available.
- */
+/** Prepare a policy facet for inclusion in a prompt. */
 export function preparePolicyContent(
   content: string,
   maxChars: number,
@@ -74,15 +79,21 @@ export function preparePolicyContent(
 ): string {
   const prepared = trimContextContent(content, maxChars);
   const lines: string[] = [prepared.content];
+
   if (prepared.truncated && sourcePath) {
     lines.push(
-      '',
-      `Policy is authoritative. If truncated, you MUST read the full policy file and follow it strictly. Source: ${sourcePath}`,
+      ...buildTruncationNotice(
+        'Policy is authoritative. If truncated, you MUST read the full policy file and follow it strictly.',
+        '',
+        sourcePath,
+      ),
     );
   }
+
   if (sourcePath) {
-    lines.push('', `Policy Source: ${sourcePath}`);
+    lines.push(...buildSourceAttribution('Policy', sourcePath));
   }
+
   lines.push('', renderConflictNotice());
   return lines.join('\n');
 }
