@@ -119,4 +119,42 @@ describe('compose', () => {
     const result = compose(facets, defaultOptions);
     expect(result.userMessage).toContain('Knowledge Source: /knowledge/arch.md');
   });
+
+  it('should append additionalInstructions after instruction', () => {
+    const facets: FacetSet = {
+      instruction: { body: 'Main task.' },
+      additionalInstructions: [
+        { body: 'Extra instruction A.' },
+        { body: 'Extra instruction B.' },
+      ],
+    };
+    const result = compose(facets, defaultOptions);
+    const mainIdx = result.userMessage.indexOf('Main task.');
+    const extraAIdx = result.userMessage.indexOf('Extra instruction A.');
+    const extraBIdx = result.userMessage.indexOf('Extra instruction B.');
+    expect(mainIdx).toBeLessThan(extraAIdx);
+    expect(extraAIdx).toBeLessThan(extraBIdx);
+  });
+
+  it('should handle additionalInstructions without primary instruction', () => {
+    const facets: FacetSet = {
+      additionalInstructions: [{ body: 'Standalone extra instruction.' }],
+    };
+    const result = compose(facets, defaultOptions);
+    expect(result.userMessage).toContain('Standalone extra instruction.');
+  });
+
+  it('should place additionalInstructions after knowledge in full composition', () => {
+    const facets: FacetSet = {
+      persona: { body: 'Persona' },
+      policies: [{ body: 'POLICY' }],
+      knowledge: [{ body: 'KNOWLEDGE' }],
+      instruction: { body: 'INSTRUCTION' },
+      additionalInstructions: [{ body: 'ADDITIONAL' }],
+    };
+    const result = compose(facets, defaultOptions);
+    const instructionIdx = result.userMessage.indexOf('INSTRUCTION');
+    const additionalIdx = result.userMessage.indexOf('ADDITIONAL');
+    expect(instructionIdx).toBeLessThan(additionalIdx);
+  });
 });

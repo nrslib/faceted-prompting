@@ -29,6 +29,8 @@ export interface FacetSet {
   readonly policies?: readonly FacetContent[];
   readonly knowledge?: readonly FacetContent[];
   readonly instruction?: FacetContent;
+  /** Additional instructions appended after the primary instruction. */
+  readonly additionalInstructions?: readonly FacetContent[];
 }
 
 /**

@@ -57,6 +57,10 @@ export function compose(facets: FacetSet, options: ComposeOptions): ComposedProm
     userParts.push(facets.instruction.body);
   }
 
+  if (facets.additionalInstructions && facets.additionalInstructions.length > 0) {
+    userParts.push(joinBodies(facets.additionalInstructions));
+  }
+
   return {
     systemPrompt,
     userMessage: userParts.join('\n\n'),
