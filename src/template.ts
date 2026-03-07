@@ -4,36 +4,28 @@
  * Supports:
  * - {{#if variable}}...{{else}}...{{/if}} conditional blocks (no nesting)
  * - {{variableName}} substitution
+ *
+ * This module has ZERO dependencies on TAKT internals.
  */
-
-type TemplateVars = Record<string, string | boolean>;
-
-/** Check if a template variable value is truthy. */
-function isTruthy(value: string | boolean | undefined): boolean {
-  return value !== undefined && value !== false && value !== '';
-}
-
-/** Resolve a variable to its string representation for substitution. */
-function resolveVar(value: string | boolean | undefined): string {
-  if (value === undefined || value === false) return '';
-  if (value === true) return 'true';
-  return value;
-}
 
 /**
  * Process {{#if variable}}...{{else}}...{{/if}} conditional blocks.
  *
+ * A variable is truthy when it is a non-empty string or boolean true.
  * Nesting is NOT supported.
  */
 export function processConditionals(
   template: string,
-  vars: TemplateVars,
+  vars: Record<string, string | boolean>,
 ): string {
   return template.replace(
     /\{\{#if\s+(\w+)\}\}([\s\S]*?)\{\{\/if\}\}/g,
     (_match, varName: string, body: string): string => {
+      const value = vars[varName];
+      const isTruthy = value !== undefined && value !== false && value !== '';
+
       const elseIndex = body.indexOf('{{else}}');
-      if (isTruthy(vars[varName])) {
+      if (isTruthy) {
         return elseIndex >= 0 ? body.slice(0, elseIndex) : body;
       }
       return elseIndex >= 0 ? body.slice(elseIndex + '{{else}}'.length) : '';
@@ -43,14 +35,21 @@ export function processConditionals(
 
 /**
  * Replace {{variableName}} placeholders with values from vars.
+ * Undefined or false variables are replaced with empty string.
+ * True is replaced with the string "true".
  */
 export function substituteVariables(
   template: string,
-  vars: TemplateVars,
+  vars: Record<string, string | boolean>,
 ): string {
   return template.replace(
     /\{\{(\w+)\}\}/g,
-    (_match, varName: string) => resolveVar(vars[varName]),
+    (_match, varName: string) => {
+      const value = vars[varName];
+      if (value === undefined || value === false) return '';
+      if (value === true) return 'true';
+      return value;
+    },
   );
 }
 
@@ -59,7 +58,7 @@ export function substituteVariables(
  */
 export function renderTemplate(
   template: string,
-  vars: TemplateVars,
+  vars: Record<string, string | boolean>,
 ): string {
   const afterConditionals = processConditionals(template, vars);
   return substituteVariables(afterConditionals, vars);

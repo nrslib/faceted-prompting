@@ -3,6 +3,8 @@
  *
  * Defines the vocabulary of facets (persona, policy, knowledge, instruction,
  * output-contract) and the structures used by compose() and DataEngine.
+ *
+ * This module has ZERO dependencies on TAKT internals.
  */
 
 /** Plural directory names used in facet resolution. */
@@ -15,7 +17,9 @@ export type FacetKind =
 
 /** A single piece of facet content with optional metadata. */
 export interface FacetContent {
+  /** Raw text body of the facet. */
   readonly body: string;
+  /** Filesystem path the content was loaded from, if applicable. */
   readonly sourcePath?: string;
 }
 
@@ -29,8 +33,6 @@ export interface FacetSet {
   readonly policies?: readonly FacetContent[];
   readonly knowledge?: readonly FacetContent[];
   readonly instruction?: FacetContent;
-  /** Additional instructions appended after the primary instruction. */
-  readonly additionalInstructions?: readonly FacetContent[];
 }
 
 /**

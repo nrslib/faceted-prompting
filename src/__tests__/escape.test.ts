@@ -1,3 +1,7 @@
+/**
+ * Unit tests for faceted-prompting escape module.
+ */
+
 import { describe, it, expect } from 'vitest';
 import { escapeTemplateChars } from '../index.js';
 

@@ -3,6 +3,8 @@
  *
  * Escapes curly braces in dynamic content so they are not
  * interpreted as template variables by the template engine.
+ *
+ * This module has ZERO dependencies on TAKT internals.
  */
 
 /**

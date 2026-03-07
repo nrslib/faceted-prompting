@@ -3,23 +3,12 @@
  *
  *   system prompt:  persona only    (WHO)
  *   user message:   policy + knowledge + instruction (HOW / WHAT TO KNOW / WHAT TO DO)
+ *
+ * This module has ZERO dependencies on TAKT internals.
  */
 
 import type { FacetSet, ComposedPrompt, ComposeOptions } from './types.js';
 import { prepareKnowledgeContent, preparePolicyContent } from './truncation.js';
-
-/** Join multiple facet bodies with a separator. */
-function joinBodies(facets: readonly { body: string }[]): string {
-  return facets.map(f => f.body).join('\n\n---\n\n');
-}
-
-/** Extract sourcePath when there is exactly one facet (otherwise undefined). */
-function singleSourcePath(
-  facets: readonly { sourcePath?: string }[],
-): string | undefined {
-  if (facets.length === 1) return facets[0]!.sourcePath;
-  return undefined;
-}
 
 /**
  * Compose facets into an LLM-ready prompt according to Faceted Prompting
@@ -33,32 +22,31 @@ export function compose(facets: FacetSet, options: ComposeOptions): ComposedProm
 
   const userParts: string[] = [];
 
+  // Policy (HOW)
   if (facets.policies && facets.policies.length > 0) {
+    const joined = facets.policies.map(p => p.body).join('\n\n---\n\n');
+    const sourcePath = facets.policies.length === 1
+      ? facets.policies[0]!.sourcePath
+      : undefined;
     userParts.push(
-      preparePolicyContent(
-        joinBodies(facets.policies),
-        options.contextMaxChars,
-        singleSourcePath(facets.policies),
-      ),
+      preparePolicyContent(joined, options.contextMaxChars, sourcePath),
     );
   }
 
+  // Knowledge (WHAT TO KNOW)
   if (facets.knowledge && facets.knowledge.length > 0) {
+    const joined = facets.knowledge.map(k => k.body).join('\n\n---\n\n');
+    const sourcePath = facets.knowledge.length === 1
+      ? facets.knowledge[0]!.sourcePath
+      : undefined;
     userParts.push(
-      prepareKnowledgeContent(
-        joinBodies(facets.knowledge),
-        options.contextMaxChars,
-        singleSourcePath(facets.knowledge),
-      ),
+      prepareKnowledgeContent(joined, options.contextMaxChars, sourcePath),
     );
   }
 
+  // Instruction (WHAT TO DO)
   if (facets.instruction) {
     userParts.push(facets.instruction.body);
-  }
-
-  if (facets.additionalInstructions && facets.additionalInstructions.length > 0) {
-    userParts.push(joinBodies(facets.additionalInstructions));
   }
 
   return {

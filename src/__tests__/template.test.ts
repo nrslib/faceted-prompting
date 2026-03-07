@@ -1,73 +1,108 @@
+/**
+ * Unit tests for faceted-prompting template engine.
+ */
+
 import { describe, it, expect } from 'vitest';
 import { renderTemplate } from '../index.js';
-import { processConditionals, substituteVariables } from '../template.js';
+import {
+  processConditionals,
+  substituteVariables,
+} from '../template.js';
 
 describe('processConditionals', () => {
   it('should include truthy block content', () => {
-    expect(processConditionals('{{#if showGreeting}}Hello!{{/if}}', { showGreeting: true })).toBe('Hello!');
+    const template = '{{#if showGreeting}}Hello!{{/if}}';
+    const result = processConditionals(template, { showGreeting: true });
+    expect(result).toBe('Hello!');
   });
 
   it('should exclude falsy block content', () => {
-    expect(processConditionals('{{#if showGreeting}}Hello!{{/if}}', { showGreeting: false })).toBe('');
+    const template = '{{#if showGreeting}}Hello!{{/if}}';
+    const result = processConditionals(template, { showGreeting: false });
+    expect(result).toBe('');
   });
 
   it('should handle else branch when truthy', () => {
-    expect(processConditionals('{{#if isAdmin}}Admin panel{{else}}User panel{{/if}}', { isAdmin: true })).toBe('Admin panel');
+    const template = '{{#if isAdmin}}Admin panel{{else}}User panel{{/if}}';
+    const result = processConditionals(template, { isAdmin: true });
+    expect(result).toBe('Admin panel');
   });
 
   it('should handle else branch when falsy', () => {
-    expect(processConditionals('{{#if isAdmin}}Admin panel{{else}}User panel{{/if}}', { isAdmin: false })).toBe('User panel');
+    const template = '{{#if isAdmin}}Admin panel{{else}}User panel{{/if}}';
+    const result = processConditionals(template, { isAdmin: false });
+    expect(result).toBe('User panel');
   });
 
   it('should treat non-empty string as truthy', () => {
-    expect(processConditionals('{{#if name}}Name: provided{{/if}}', { name: 'Alice' })).toBe('Name: provided');
+    const template = '{{#if name}}Name: provided{{/if}}';
+    const result = processConditionals(template, { name: 'Alice' });
+    expect(result).toBe('Name: provided');
   });
 
   it('should treat empty string as falsy', () => {
-    expect(processConditionals('{{#if name}}Name: provided{{/if}}', { name: '' })).toBe('');
+    const template = '{{#if name}}Name: provided{{/if}}';
+    const result = processConditionals(template, { name: '' });
+    expect(result).toBe('');
   });
 
   it('should treat undefined variable as falsy', () => {
-    expect(processConditionals('{{#if missing}}exists{{else}}missing{{/if}}', {})).toBe('missing');
+    const template = '{{#if missing}}exists{{else}}missing{{/if}}';
+    const result = processConditionals(template, {});
+    expect(result).toBe('missing');
   });
 
   it('should handle multiline content in blocks', () => {
-    expect(processConditionals('{{#if hasContent}}line1\nline2\nline3{{/if}}', { hasContent: true })).toBe('line1\nline2\nline3');
+    const template = '{{#if hasContent}}line1\nline2\nline3{{/if}}';
+    const result = processConditionals(template, { hasContent: true });
+    expect(result).toBe('line1\nline2\nline3');
   });
 });
 
 describe('substituteVariables', () => {
   it('should replace variable with string value', () => {
-    expect(substituteVariables('Hello {{name}}!', { name: 'World' })).toBe('Hello World!');
+    const result = substituteVariables('Hello {{name}}!', { name: 'World' });
+    expect(result).toBe('Hello World!');
   });
 
   it('should replace true with string "true"', () => {
-    expect(substituteVariables('Value: {{flag}}', { flag: true })).toBe('Value: true');
+    const result = substituteVariables('Value: {{flag}}', { flag: true });
+    expect(result).toBe('Value: true');
   });
 
   it('should replace false with empty string', () => {
-    expect(substituteVariables('Value: {{flag}}', { flag: false })).toBe('Value: ');
+    const result = substituteVariables('Value: {{flag}}', { flag: false });
+    expect(result).toBe('Value: ');
   });
 
   it('should replace undefined variable with empty string', () => {
-    expect(substituteVariables('Value: {{missing}}', {})).toBe('Value: ');
+    const result = substituteVariables('Value: {{missing}}', {});
+    expect(result).toBe('Value: ');
   });
 
   it('should handle multiple variables', () => {
-    expect(substituteVariables('{{greeting}} {{name}}!', { greeting: 'Hello', name: 'World' })).toBe('Hello World!');
+    const result = substituteVariables('{{greeting}} {{name}}!', {
+      greeting: 'Hello',
+      name: 'World',
+    });
+    expect(result).toBe('Hello World!');
   });
 });
 
 describe('renderTemplate', () => {
   it('should process conditionals and then substitute variables', () => {
-    expect(renderTemplate('{{#if hasName}}Name: {{name}}{{else}}Anonymous{{/if}}', { hasName: true, name: 'Alice' })).toBe('Name: Alice');
+    const template = '{{#if hasName}}Name: {{name}}{{else}}Anonymous{{/if}}';
+    const result = renderTemplate(template, { hasName: true, name: 'Alice' });
+    expect(result).toBe('Name: Alice');
   });
 
   it('should handle template with no conditionals', () => {
-    expect(renderTemplate('Hello {{name}}!', { name: 'World' })).toBe('Hello World!');
+    const result = renderTemplate('Hello {{name}}!', { name: 'World' });
+    expect(result).toBe('Hello World!');
   });
 
   it('should handle template with no variables', () => {
-    expect(renderTemplate('Static text', {})).toBe('Static text');
+    const result = renderTemplate('Static text', {});
+    expect(result).toBe('Static text');
   });
 });
