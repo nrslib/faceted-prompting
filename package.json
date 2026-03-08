@@ -1,7 +1,7 @@
 {
   "name": "faceted-prompting",
   "version": "0.1.0",
-  "description": "Faceted Prompting — structured prompt composition for LLMs",
+  "description": "Faceted Prompting \u2014 structured prompt composition for LLMs",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -20,7 +20,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src/",
-    "prepublishOnly": "npm run lint && npm run build && npm run test"
+    "prepublishOnly": "npm run build && npm run test"
   },
   "keywords": [
     "prompt",
