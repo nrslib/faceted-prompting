@@ -1,0 +1,35 @@
+# テストレビュー
+
+## 結果: REJECT
+
+## サマリー
+新規挙動 `userMessageOrder` の回帰を検出するアサーションが不足しており、順序制御が壊れても通過しうるため差し戻しです。  
+他の観点（独立性・再現性・フィクスチャ運用・命名）は概ね成立しています。
+
+## 確認した観点
+| 観点 | 結果 | 備考 |
+|------|------|------|
+| テストカバレッジ | ❌ | `order` 反映の直接検証が不足 |
+| テスト構造（Given-When-Then） | ✅ | Arrange/Act/Assert は概ね明確 |
+| テスト命名 | ✅ | 振る舞いベースで読める |
+| テスト独立性・再現性 | ✅ | 一時ディレクトリ作成/後始末で隔離 |
+| モック・フィクスチャ | ✅ | 注入可能設計を活用し適切 |
+| テスト戦略（ユニット/統合/E2E） | ✅ | モジュール横断フローに統合テストを採用 |
+
+## 今回の指摘（new）
+| # | finding_id | family_tag | カテゴリ | 場所 | 問題 | 修正案 |
+|---|------------|------------|---------|------|------|--------|
+| 1 | TREV-001 | test-coverage | カバレッジ | `src/__tests__/it-cli-compose-flow.test.ts:93` | `knowledgeIndex > systemIndex` / `policyIndex > systemIndex` / `instructionIndex > policyIndex` のみで、`order: [knowledge, policies, instruction]` が無視されても通る。新規挙動 `userMessageOrder` の回帰検知になっていない。 | `expect(knowledgeIndex).toBeLessThan(policyIndex)` を追加し順序適用を直接検証。加えて `src/__tests__/compose.test.ts` に `userMessageOrder` 指定時の順序ユニットテストを1件追加。 |
+
+## 継続指摘（persists）
+なし
+
+## 解消済み（resolved）
+なし
+
+## 再開指摘（reopened）
+なし
+
+## REJECT判定条件
+- `new`、`persists`、または `reopened` が1件以上ある場合のみ REJECT 可
+- `finding_id` なしの指摘は無効

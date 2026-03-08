@@ -1,0 +1,41 @@
+# AI生成コードレビュー
+
+## 結果: REJECT
+
+## サマリー
+前回REJECTの4件は解消されたが、新規ブロッキング指摘（未使用公開コード・要件取りこぼし・禁止コメント）が3件あるため差し戻し。
+
+## 検証した項目
+| 観点 | 結果 | 備考 |
+|------|------|------|
+| 仮定の妥当性 | ❌ | `config.yaml` 読み込み要件が未実装 |
+| API/ライブラリの実在 | ✅ | 幻覚APIは未検出 |
+| コンテキスト適合 | ❌ | ポリシー禁止の説明コメントを新規追加 |
+| スコープ | ❌ | 変更起因の未使用公開コードあり |
+
+## 今回の指摘（new）
+| # | finding_id | family_tag | カテゴリ | 場所 | 問題 | 修正案 |
+|---|------------|------------|---------|------|------|--------|
+| 1 | AIREV-005 | dead-code | 未使用コード | `src/config/index.ts:4` | `FacetedConfig` がexportされているが使用箇所なし | 実使用へ配線するか定義/公開を削除 |
+| 2 | AIREV-006 | scope-shrink | 要件取りこぼし | `src/config/index.ts:19`, `src/cli/index.ts:112` | `~/.faceted/config.yaml` の読み込み処理が未実装（生成のみ） | `readFacetedConfig` 実装とCLI配線を追加 |
+| 3 | AIREV-007 | style-policy | ポリシー違反 | `src/__tests__/compose-definition.test.ts:34` ほか | Given/When/Then の説明コメントを追加 | 説明コメントを削除しテスト名/検証式で表現 |
+
+## 継続指摘（persists）
+| # | finding_id | family_tag | 前回根拠 | 今回根拠 | 問題 | 修正案 |
+|---|------------|------------|----------|----------|------|--------|
+
+## 解消済み（resolved）
+| finding_id | 解消根拠 |
+|------------|----------|
+| AIREV-001 | `src/resolve.ts:267` で実YAMLパースへ置換、`src/__tests__/compose-definition.test.ts:102` で回帰テスト確認 |
+| AIREV-002 | `src/index.ts` から内部実装の公開exportが除去済み |
+| AIREV-003 | `readConfigYaml` が削除され未使用公開関数が解消 |
+| AIREV-004 | `src/cli/index.ts:6` で `isResourcePath` 再利用に統一 |
+
+## 再開指摘（reopened）
+| # | finding_id | family_tag | 解消根拠（前回） | 再発根拠 | 問題 | 修正案 |
+|---|------------|------------|----------------|---------|------|--------|
+
+## REJECT判定条件
+- `new`、`persists`、または `reopened` が1件以上ある場合のみ REJECT 可
+- `finding_id` なしの指摘は無効

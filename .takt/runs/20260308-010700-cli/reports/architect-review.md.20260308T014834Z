@@ -1,0 +1,31 @@
+# アーキテクチャレビュー
+
+## 結果: REJECT
+
+## サマリー
+`src/resolve.ts` に責務混在とファイル肥大（311行）があり、構造基準（1ファイル300行超はREJECT）に抵触しています。前回open findingはないため、今回指摘はすべて `new` です。
+
+## 確認した観点
+- [x] 構造・設計
+- [x] コード品質
+- [x] 変更スコープ
+- [x] テストカバレッジ
+- [x] デッドコード
+- [x] 呼び出しチェーン検証
+
+## 今回の指摘（new）
+| # | finding_id | family_tag | スコープ | 場所 | 問題 | 修正案 |
+|---|------------|------------|---------|------|------|--------|
+| 1 | ARCH-001 | design-violation | スコープ内 | `src/resolve.ts:1`, `src/resolve.ts:212`, `src/resolve.ts:288`, `src/cli/index.ts:6` | 汎用参照解決モジュールにCLI専用のcompose定義ロード/検証責務が同居し、`src/resolve.ts` が311行で基準超過。高凝集・責務分離を満たしていない。 | `loadComposeDefinition` と関連定数/検証関数を `src/compose-definition.ts`（または `src/cli/compose-definition.ts`）へ分離し、`resolve.ts` は参照解決責務のみに限定する。 |
+
+## 継続指摘（persists）
+該当なし
+
+## 解消済み（resolved）
+該当なし
+
+## 再開指摘（reopened）
+該当なし
+
+## REJECT判定条件
+- `new` が1件存在するため REJECT。

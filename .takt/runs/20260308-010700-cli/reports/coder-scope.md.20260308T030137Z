@@ -1,0 +1,31 @@
+# 変更スコープ宣言
+
+## タスク
+`facet compose` CLI フロー（初期化・compose定義検証・出力生成）を、既存テスト期待に合わせて実装する。
+
+## 変更予定
+| 種別 | ファイル |
+|------|---------|
+| 作成 | `bin/facet` |
+| 作成 | `src/cli/index.ts` |
+| 作成 | `src/cli/runner.ts` |
+| 作成 | `src/config/index.ts` |
+| 作成 | `src/init/index.ts` |
+| 作成 | `src/output/index.ts` |
+| 変更 | `src/resolve.ts` |
+| 変更 | `src/compose.ts` |
+| 変更 | `src/types.ts` |
+| 変更 | `src/index.ts` |
+| 変更 | `package.json` |
+| 変更 | `README.md` |
+
+## 推定規模
+Large
+
+## 影響範囲
+- `facet compose` のCLI実行フロー
+- `~/.faceted` 初期化処理（config/必須ディレクトリ/テンプレート）
+- compose定義YAMLのロード・検証（Fail Fast）
+- persona/system・他要素/user の合成と順序制御
+- 生成物の出力先解決とファイル書き込み
+- npmグローバル実行用エントリ構成

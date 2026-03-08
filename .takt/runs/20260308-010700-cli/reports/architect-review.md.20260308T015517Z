@@ -1,0 +1,7 @@
+# アーキテクチャレビュー
+
+## 結果: APPROVE
+
+## サマリー
+前回 open findings はなく、今回も `new / persists / reopened` は検出されませんでした。  
+`ARCH-001`（`resolve.ts` の責務混在）は `compose-definition` 分離と境界テストで解消され、設計・依存方向・呼び出しチェーンは妥当です。

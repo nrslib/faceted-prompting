@@ -21,32 +21,36 @@ export function compose(facets: FacetSet, options: ComposeOptions): ComposedProm
   const systemPrompt = facets.persona?.body ?? '';
 
   const userParts: string[] = [];
+  const order = options.userMessageOrder ?? ['policies', 'knowledge', 'instruction'];
 
-  // Policy (HOW)
-  if (facets.policies && facets.policies.length > 0) {
-    const joined = facets.policies.map(p => p.body).join('\n\n---\n\n');
-    const sourcePath = facets.policies.length === 1
-      ? facets.policies[0]!.sourcePath
-      : undefined;
-    userParts.push(
-      preparePolicyContent(joined, options.contextMaxChars, sourcePath),
-    );
-  }
+  for (const entry of order) {
+    if (entry === 'policies') {
+      if (!facets.policies || facets.policies.length === 0) continue;
+      const joined = facets.policies.map(p => p.body).join('\n\n---\n\n');
+      const sourcePath = facets.policies.length === 1
+        ? facets.policies[0]!.sourcePath
+        : undefined;
+      userParts.push(
+        preparePolicyContent(joined, options.contextMaxChars, sourcePath),
+      );
+      continue;
+    }
 
-  // Knowledge (WHAT TO KNOW)
-  if (facets.knowledge && facets.knowledge.length > 0) {
-    const joined = facets.knowledge.map(k => k.body).join('\n\n---\n\n');
-    const sourcePath = facets.knowledge.length === 1
-      ? facets.knowledge[0]!.sourcePath
-      : undefined;
-    userParts.push(
-      prepareKnowledgeContent(joined, options.contextMaxChars, sourcePath),
-    );
-  }
+    if (entry === 'knowledge') {
+      if (!facets.knowledge || facets.knowledge.length === 0) continue;
+      const joined = facets.knowledge.map(k => k.body).join('\n\n---\n\n');
+      const sourcePath = facets.knowledge.length === 1
+        ? facets.knowledge[0]!.sourcePath
+        : undefined;
+      userParts.push(
+        prepareKnowledgeContent(joined, options.contextMaxChars, sourcePath),
+      );
+      continue;
+    }
 
-  // Instruction (WHAT TO DO)
-  if (facets.instruction) {
-    userParts.push(facets.instruction.body);
+    if (entry === 'instruction' && facets.instruction) {
+      userParts.push(facets.instruction.body);
+    }
   }
 
   return {

@@ -1,0 +1,19 @@
+# 変更スコープ宣言
+
+## タスク
+`facet compose` CLI 実装に先行して、初期化・定義解決・CLI実行フローを検証するテストを追加する
+
+## 変更予定
+| 種別 | ファイル |
+|------|---------|
+| 作成 | `src/__tests__/compose-definition.test.ts` |
+| 作成 | `src/__tests__/init.test.ts` |
+| 作成 | `src/__tests__/it-cli-compose-flow.test.ts` |
+
+## 推定規模
+Medium
+
+## 影響範囲
+- compose定義YAMLのバリデーションと解決
+- `~/.faceted` 初回初期化処理
+- `facet compose` の対話選択から出力生成までの実行フロー

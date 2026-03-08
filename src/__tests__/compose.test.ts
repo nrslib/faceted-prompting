@@ -75,6 +75,26 @@ describe('compose', () => {
     expect(knowledgeIdx).toBeLessThan(instructionIdx);
   });
 
+  it('should honor userMessageOrder when provided', () => {
+    const facets: FacetSet = {
+      policies: [{ body: 'POLICY' }],
+      knowledge: [{ body: 'KNOWLEDGE' }],
+      instruction: { body: 'INSTRUCTION' },
+    };
+
+    const result = compose(facets, {
+      contextMaxChars: 2000,
+      userMessageOrder: ['knowledge', 'policies', 'instruction'],
+    });
+
+    const knowledgeIdx = result.userMessage.indexOf('KNOWLEDGE');
+    const policyIdx = result.userMessage.indexOf('POLICY');
+    const instructionIdx = result.userMessage.indexOf('INSTRUCTION');
+
+    expect(knowledgeIdx).toBeLessThan(policyIdx);
+    expect(policyIdx).toBeLessThan(instructionIdx);
+  });
+
   it('should join multiple policies with separator', () => {
     const facets: FacetSet = {
       policies: [

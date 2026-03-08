@@ -1,0 +1,35 @@
+# アーキテクチャレビュー
+
+## 結果: REJECT
+
+## サマリー
+出力先パス解決の依存方向に設計不整合があり、`runFacetCli` が受け取る `cwd` 契約を `resolveOutputDirectory` が満たしていません。  
+前回指摘 `ARCH-001` は解消済みですが、今回 `new` が1件あるため差し戻しです。
+
+## 確認した観点
+- [x] 構造・設計
+- [x] コード品質
+- [x] 変更スコープ
+- [x] テストカバレッジ
+- [x] デッドコード
+- [x] 呼び出しチェーン検証
+
+## 今回の指摘（new）
+| # | finding_id | family_tag | スコープ | 場所 | 問題 | 修正案 |
+|---|------------|------------|---------|------|------|--------|
+| 1 | ARCH-002 | design-violation | スコープ内 | `src/output/index.ts:5`, `src/output/index.ts:10`, `src/cli/index.ts:193` | 相対出力パスが `defaultDirectory` ではなくプロセスCWD基準で解決され、`runFacetCli(options.cwd)` の契約と依存方向が不整合。呼び出しチェーン上の配線漏れ。 | `resolveOutputDirectory` で相対入力を `resolve(defaultDirectory, trimmed)` で解決し、`options.cwd` を唯一の基準に統一。相対入力ケースの回帰テストを追加。 |
+
+## 継続指摘（persists）
+該当なし
+
+## 解消済み（resolved）
+| finding_id | 解消根拠 |
+|------------|----------|
+| ARCH-001 | `loadComposeDefinition` が `src/compose-definition.ts` に分離され、`src/resolve.ts` から除去されている（モジュール境界テストあり）。 |
+
+## 再開指摘（reopened）
+該当なし
+
+## REJECT判定条件
+- `new`、`persists`、または `reopened` が1件以上ある場合のみ REJECT 可
+- `finding_id` なしの指摘は無効

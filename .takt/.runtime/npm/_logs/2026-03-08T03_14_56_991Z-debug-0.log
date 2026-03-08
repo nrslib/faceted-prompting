@@ -1,0 +1,23 @@
+0 verbose cli /Users/nrs/.local/share/mise/installs/node/25.7.0/bin/node /Users/nrs/.local/share/mise/installs/node/25.7.0/lib/node_modules/npm/bin/npm-cli.js
+1 info using npm@11.10.1
+2 info using node@v25.7.0
+3 silly config load:file:/Users/nrs/.local/share/mise/installs/node/25.7.0/lib/node_modules/npm/npmrc
+4 silly config load:file:/Users/nrs/work/git/takt-worktrees/20260308T0107-3-implement-facet-compose-cli/.npmrc
+5 silly config load:file:/Users/nrs/.npmrc
+6 silly config load:file:/Users/nrs/.local/share/mise/installs/node/25.7.0/etc/npmrc
+7 verbose title npm audit
+8 verbose argv "audit" "--omit" "dev"
+9 verbose logfile logs-max:10 dir:/Users/nrs/work/git/takt-worktrees/20260308T0107-3-implement-facet-compose-cli/.takt/.runtime/npm/_logs/2026-03-08T03_14_56_991Z-
+10 verbose logfile /Users/nrs/work/git/takt-worktrees/20260308T0107-3-implement-facet-compose-cli/.takt/.runtime/npm/_logs/2026-03-08T03_14_56_991Z-debug-0.log
+11 silly logfile start cleaning logs, removing 1 files
+12 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+13 silly logfile done cleaning log files
+14 silly audit bulk request { yaml: [ '2.8.2' ] }
+15 http fetch POST 200 https://registry.npmjs.org/-/npm/v1/security/advisories/bulk 548ms
+16 silly audit report {}
+17 verbose cwd /Users/nrs/work/git/takt-worktrees/20260308T0107-3-implement-facet-compose-cli
+18 verbose os Darwin 25.3.0
+19 verbose node v25.7.0
+20 verbose npm  v11.10.1
+21 verbose exit 0
+22 info ok

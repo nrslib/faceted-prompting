@@ -1,0 +1,7 @@
+# 要件充足レビュー
+
+## 結果: APPROVE
+
+## サマリー
+`order.md` で求められた `facet compose` のCLI配布、初回初期化（`~/.faceted/config.yaml` と必須ディレクトリ/テンプレート）、compose定義要件（`name`必須・`description`任意・persona順序対象外）、対話選択/出力先指定、README反映は実装根拠と整合していました。  
+前回open findingsはなく、今回も `new` / `persists` / `reopened` はありません。

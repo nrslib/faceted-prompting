@@ -1,0 +1,7 @@
+# 要件充足レビュー
+
+## 結果: APPROVE
+
+## サマリー
+`order.md` で要求された `facet compose` CLI配布、初期化（`~/.faceted/config.yaml` と各 facets ディレクトリ/テンプレート）、compose定義（`name`必須・`description`任意・persona順序対象外）、対話選択/出力先入力、README追記は、実装とレポート履歴の整合が確認できました。  
+前回 open finding の持ち越しはなく、今回 `new/persists/reopened` もありません。
