@@ -1,0 +1,83 @@
+import { describe, expect, it } from 'vitest';
+import { runMain } from '../cli/runner.js';
+
+describe('runner', () => {
+  it('should print generated path when runFacetCli returns path result', async () => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    let exitCode: number | undefined;
+
+    await runMain(['compose'], {
+      runFacetCli: async () => ({
+        kind: 'path',
+        path: '/tmp/out.prompt.md',
+      }),
+      writeStdout: message => {
+        stdout.push(message);
+      },
+      writeStderr: message => {
+        stderr.push(message);
+      },
+      setExitCode: code => {
+        exitCode = code;
+      },
+    });
+
+    expect(stdout).toEqual(['Generated: /tmp/out.prompt.md\n']);
+    expect(stderr).toEqual([]);
+    expect(exitCode).toBeUndefined();
+  });
+
+  it('should print text output when runFacetCli returns text result', async () => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    let exitCode: number | undefined;
+
+    await runMain(['list', 'skill'], {
+      runFacetCli: async () => ({
+        kind: 'text',
+        text: 'cc\n- coding (mode: inline, source: coding.yaml, output: ~/.claude/skills/coding/SKILL.md)',
+      }),
+      writeStdout: message => {
+        stdout.push(message);
+      },
+      writeStderr: message => {
+        stderr.push(message);
+      },
+      setExitCode: code => {
+        exitCode = code;
+      },
+    });
+
+    expect(stdout).toEqual([
+      'cc\n- coding (mode: inline, source: coding.yaml, output: ~/.claude/skills/coding/SKILL.md)\n',
+    ]);
+    expect(stderr).toEqual([]);
+    expect(exitCode).toBeUndefined();
+  });
+
+  it('should print failure message and set exit code when runFacetCli throws', async () => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    let exitCode: number | undefined;
+
+    await runMain(['install', 'skill'], {
+      runFacetCli: async () => {
+        throw new Error('boom');
+      },
+      writeStdout: message => {
+        stdout.push(message);
+      },
+      writeStderr: message => {
+        stderr.push(message);
+      },
+      setExitCode: code => {
+        exitCode = code;
+      },
+    });
+
+    expect(stdout).toEqual([]);
+    expect(stderr).toEqual(['facet command failed: boom\n']);
+    expect(exitCode).toBe(1);
+  });
+});
