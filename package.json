@@ -1,10 +1,13 @@
 {
   "name": "faceted-prompting",
   "version": "0.1.0",
-  "description": "Faceted Prompting \u2014 structured prompt composition for LLMs",
+  "description": "Faceted Prompting — structured prompt composition for LLMs",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "bin": {
+    "facet": "./bin/facet"
+  },
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -12,7 +15,8 @@
     }
   },
   "files": [
-    "dist"
+    "dist",
+    "bin/facet"
   ],
   "scripts": {
     "build": "tsc",
@@ -38,5 +42,8 @@
     "eslint": "^9.0.0",
     "typescript": "^5.9.3",
     "vitest": "^3.2.4"
+  },
+  "dependencies": {
+    "yaml": "^2.8.1"
   }
 }

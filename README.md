@@ -19,6 +19,55 @@ Faceted Prompting organizes LLM prompts into distinct facets:
 npm install faceted-prompting
 ```
 
+Global CLI:
+
+```bash
+npm install -g faceted-prompting
+facet compose
+```
+
+First run initializes `~/.faceted`:
+
+- `~/.faceted/config.yaml`
+- `~/.faceted/facets/persona`
+- `~/.faceted/facets/knowledge`
+- `~/.faceted/facets/policies`
+- `~/.faceted/facets/compositions`
+
+## `facet compose` Usage
+
+1. Run `facet compose`.
+2. Select a composition with `↑` / `↓` and press `Enter`.
+3. Confirm output directory (default: current working directory) or type another path.
+4. If `{name}.prompt.md` already exists, confirm overwrite (`y`/`yes` to overwrite).
+5. Generated prompt file is written as `{name}.prompt.md`.
+
+When `~/.faceted` is already initialized, `facet compose` reuses existing config/templates and does not overwrite files.
+
+### Compose Definition YAML
+
+Place definition files in `~/.faceted/facets/compositions/*.yaml`.
+
+```yaml
+name: release
+description: Release summary composition
+persona: coder
+knowledge:
+  - architecture
+policies:
+  - quality
+instruction: Summarize release impact.
+order:
+  - knowledge
+  - policies
+  - instruction
+```
+
+- `name` is required.
+- `description` is optional.
+- `order` applies only to user-message sections (`knowledge`, `policies`, `instruction`).
+- `persona` is always used for `systemPrompt` and is not order-controlled.
+
 ## Quick Start
 
 ```typescript

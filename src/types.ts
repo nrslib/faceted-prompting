@@ -46,8 +46,24 @@ export interface ComposedPrompt {
   readonly userMessage: string;
 }
 
+/** User-message sections that can be ordered in compose definitions. */
+export type ComposeOrderEntry = 'policies' | 'knowledge' | 'instruction';
+
+/** CLI compose definition loaded from YAML. */
+export interface ComposeDefinition {
+  readonly name: string;
+  readonly description?: string;
+  readonly persona: string;
+  readonly knowledge?: readonly string[];
+  readonly policies?: readonly string[];
+  readonly instruction?: string;
+  readonly order?: readonly ComposeOrderEntry[];
+}
+
 /** Options controlling compose() behaviour. */
 export interface ComposeOptions {
   /** Maximum character length for knowledge/policy content before truncation. */
   readonly contextMaxChars: number;
+  /** Optional user-message section order for policies/knowledge/instruction. */
+  readonly userMessageOrder?: readonly ComposeOrderEntry[];
 }
