@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tracedConfig } from 'traced-config';
+import { tracedConfig, type ValidateError } from 'traced-config';
 import { parse } from 'yaml';
 
 export interface FacetedConfig {
@@ -28,21 +28,20 @@ export function ensureConfigFile(homeDir: string): void {
   }
 }
 
-function ensureNumber(value: unknown, field: string): number {
-  if (typeof value !== 'number' || Number.isNaN(value)) {
-    throw new Error(`Invalid faceted config field: ${field}`);
+function parseConfigRootAsObject(content: string): Record<string, unknown> {
+  const parsed = parse(content);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    throw new Error('Config root must be an object');
   }
-  return value;
+  return parsed as Record<string, unknown>;
 }
 
-function ensureStringList(value: unknown, field: string): string[] | undefined {
-  if (value === undefined) {
-    return undefined;
+function hasErrorCode(error: unknown): error is NodeJS.ErrnoException {
+  if (typeof error !== 'object' || error === null) {
+    return false;
   }
-  if (!Array.isArray(value) || !value.every(item => typeof item === 'string')) {
-    throw new Error(`Invalid faceted config field: ${field}`);
-  }
-  return value;
+  const withCode = error as { code?: unknown };
+  return typeof withCode.code === 'string';
 }
 
 export async function readFacetedConfig(homeDir: string): Promise<FacetedConfig> {
@@ -56,42 +55,44 @@ export async function readFacetedConfig(homeDir: string): Promise<FacetedConfig>
       version: {
         default: 1,
         doc: 'config schema version',
+        format: Number,
         sources: { global: false, local: true, env: false, cli: false },
       },
       skillPaths: {
-        default: [],
+        default: [] as string[],
         doc: 'skill path list',
+        format: 'string-list',
         sources: { global: false, local: true, env: false, cli: false },
       },
     },
   });
 
-  resolver.addParser('yaml', content => {
-    const parsed = parse(content);
-    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-      throw new Error(`Invalid faceted config file: ${configPath}`);
-    }
-    return parsed;
+  resolver.addFormat('string-list', value => {
+    return Array.isArray(value) && value.every(item => typeof item === 'string');
   });
+  resolver.addParser('yaml', parseConfigRootAsObject);
+  resolver.addParser('yml', parseConfigRootAsObject);
 
   try {
     await resolver.loadFile([{ path: configPath, label: 'local' }]);
   } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message === `Failed to parse config file '${configPath}' (label: local)`
-    ) {
-      throw new Error(`Invalid faceted config file: ${configPath}`);
+    if (hasErrorCode(error)) {
+      throw error;
     }
-    throw error;
+    throw new Error(`Invalid faceted config file: ${configPath}`);
   }
 
-  const config = {
+  const validationIssues: ValidateError[] = resolver.validate();
+  if (validationIssues.length > 0) {
+    const invalidField = validationIssues[0]?.key;
+    if (invalidField) {
+      throw new Error(`Invalid faceted config field: ${invalidField}`);
+    }
+    throw new Error('Invalid faceted config field');
+  }
+
+  return {
     version: resolver.get('version'),
     skillPaths: resolver.get('skillPaths'),
-  };
-  return {
-    version: ensureNumber(config.version, 'version'),
-    skillPaths: ensureStringList(config.skillPaths, 'skillPaths'),
   };
 }
