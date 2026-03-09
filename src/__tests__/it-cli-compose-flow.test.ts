@@ -10,7 +10,10 @@ type CliModule = {
     homeDir: string;
     select: (candidates: string[]) => Promise<string>;
     input: (prompt: string, defaultValue: string) => Promise<string>;
-  }) => Promise<{ outputPath: string }>;
+  }) => Promise<
+    | { kind: 'path'; path: string }
+    | { kind: 'text'; text: string }
+  >;
 };
 
 async function loadCliModule(): Promise<CliModule> {
@@ -80,10 +83,14 @@ describe('facet compose integration flow', () => {
         return outputDir;
       },
     });
-    expect(result.outputPath.startsWith(outputDir)).toBe(true);
-    expect(existsSync(result.outputPath)).toBe(true);
+    expect(result.kind).toBe('path');
+    if (result.kind !== 'path') {
+      throw new Error('Expected path result for compose command');
+    }
+    expect(result.path.startsWith(outputDir)).toBe(true);
+    expect(existsSync(result.path)).toBe(true);
 
-    const generated = readFileSync(result.outputPath, 'utf-8');
+    const generated = readFileSync(result.path, 'utf-8');
     const systemIndex = generated.indexOf('You are a release engineer.');
     const knowledgeIndex = generated.indexOf('System architecture notes.');
     const policyIndex = generated.indexOf('Never hide errors.');
@@ -110,6 +117,20 @@ describe('facet compose integration flow', () => {
     })).rejects.toThrow('Unsupported command: unknown');
   });
 
+  it('should reject when command is missing', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli([], {
+      cwd: workspaceDir,
+      homeDir,
+      select: async () => 'unused',
+      input: async (_prompt, defaultValue) => defaultValue,
+    })).rejects.toThrow('Unsupported command: (none)');
+  });
+
   it('should initialize faceted home on first run and write output to cwd when input is blank', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
@@ -130,9 +151,13 @@ describe('facet compose integration flow', () => {
     });
 
     expect(existsSync(join(homeDir, '.faceted', 'config.yaml'))).toBe(true);
-    expect(result.outputPath).toBe(join(workspaceDir, 'default.prompt.md'));
+    expect(result.kind).toBe('path');
+    if (result.kind !== 'path') {
+      throw new Error('Expected path result for compose command');
+    }
+    expect(result.path).toBe(join(workspaceDir, 'default.prompt.md'));
 
-    const generated = readFileSync(result.outputPath, 'utf-8');
+    const generated = readFileSync(result.path, 'utf-8');
     expect(generated).toContain('# System Prompt');
     expect(generated).toContain('You are a helpful assistant.');
   });
@@ -373,7 +398,11 @@ describe('facet compose integration flow', () => {
       },
     });
 
-    expect(result.outputPath).toBe(outputPath);
+    expect(result.kind).toBe('path');
+    if (result.kind !== 'path') {
+      throw new Error('Expected path result for compose command');
+    }
+    expect(result.path).toBe(outputPath);
     expect(readFileSync(outputPath, 'utf-8')).toContain('You are a release engineer.');
   });
 
