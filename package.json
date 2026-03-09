@@ -35,7 +35,7 @@
   ],
   "license": "MIT",
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "devDependencies": {
     "@types/node": "^22.19.11",
@@ -44,6 +44,7 @@
     "vitest": "^3.2.4"
   },
   "dependencies": {
+    "traced-config": "^0.1.0",
     "yaml": "^2.8.1"
   }
 }

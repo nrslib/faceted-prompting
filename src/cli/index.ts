@@ -101,7 +101,7 @@ export async function runFacetCli(
   const subcommand = args[1];
 
   await initializeFacetedHome({ homeDir: options.homeDir });
-  readFacetedConfig(options.homeDir);
+  await readFacetedConfig(options.homeDir);
 
   if (command === 'compose') {
     return runComposeCommand(options);

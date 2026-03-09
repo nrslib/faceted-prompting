@@ -1,5 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { tracedConfig } from 'traced-config';
 import { parse } from 'yaml';
 
 export interface FacetedConfig {
@@ -44,18 +45,51 @@ function ensureStringList(value: unknown, field: string): string[] | undefined {
   return value;
 }
 
-export function readFacetedConfig(homeDir: string): FacetedConfig {
+export async function readFacetedConfig(homeDir: string): Promise<FacetedConfig> {
   const configPath = getConfigPath(homeDir);
   if (!existsSync(configPath)) {
     throw new Error(`Missing faceted config: ${configPath}`);
   }
 
-  const parsed = parse(readFileSync(configPath, 'utf-8'));
-  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error(`Invalid faceted config file: ${configPath}`);
+  const resolver = tracedConfig({
+    schema: {
+      version: {
+        default: 1,
+        doc: 'config schema version',
+        sources: { global: false, local: true, env: false, cli: false },
+      },
+      skillPaths: {
+        default: [],
+        doc: 'skill path list',
+        sources: { global: false, local: true, env: false, cli: false },
+      },
+    },
+  });
+
+  resolver.addParser('yaml', content => {
+    const parsed = parse(content);
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      throw new Error(`Invalid faceted config file: ${configPath}`);
+    }
+    return parsed;
+  });
+
+  try {
+    await resolver.loadFile([{ path: configPath, label: 'local' }]);
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      error.message === `Failed to parse config file '${configPath}' (label: local)`
+    ) {
+      throw new Error(`Invalid faceted config file: ${configPath}`);
+    }
+    throw error;
   }
 
-  const config = parsed as Record<string, unknown>;
+  const config = {
+    version: resolver.get('version'),
+    skillPaths: resolver.get('skillPaths'),
+  };
   return {
     version: ensureNumber(config.version, 'version'),
     skillPaths: ensureStringList(config.skillPaths, 'skillPaths'),
