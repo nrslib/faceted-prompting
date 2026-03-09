@@ -1,6 +1,6 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { tracedConfig } from 'traced-config';
+import { tracedConfig, type ValidateError } from 'traced-config';
 import { parse } from 'yaml';
 
 export interface FacetedConfig {
@@ -28,32 +28,20 @@ export function ensureConfigFile(homeDir: string): void {
   }
 }
 
-function getInvalidFieldFromValidationIssue(issue: unknown): string | undefined {
-  if (typeof issue === 'string' && issue.length > 0) {
-    return issue;
-  }
-  if (!issue || typeof issue !== 'object') {
-    return undefined;
-  }
-
-  const record = issue as Record<string, unknown>;
-  const key = record.key;
-  if (typeof key === 'string' && key.length > 0) {
-    return key;
-  }
-  const field = record.field;
-  if (typeof field === 'string' && field.length > 0) {
-    return field;
-  }
-  return undefined;
-}
-
-function assertConfigRootIsObject(configPath: string): void {
-  const content = readFileSync(configPath, 'utf-8');
+function parseConfigRootAsObject(content: string): Record<string, unknown> {
   const parsed = parse(content);
   if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
-    throw new Error(`Invalid faceted config file: ${configPath}`);
+    throw new Error('Config root must be an object');
   }
+  return parsed as Record<string, unknown>;
+}
+
+function hasErrorCode(error: unknown): error is NodeJS.ErrnoException {
+  if (typeof error !== 'object' || error === null) {
+    return false;
+  }
+  const withCode = error as { code?: unknown };
+  return typeof withCode.code === 'string';
 }
 
 export async function readFacetedConfig(homeDir: string): Promise<FacetedConfig> {
@@ -82,24 +70,21 @@ export async function readFacetedConfig(homeDir: string): Promise<FacetedConfig>
   resolver.addFormat('string-list', value => {
     return Array.isArray(value) && value.every(item => typeof item === 'string');
   });
+  resolver.addParser('yaml', parseConfigRootAsObject);
+  resolver.addParser('yml', parseConfigRootAsObject);
 
   try {
     await resolver.loadFile([{ path: configPath, label: 'local' }]);
   } catch (error) {
-    if (
-      error instanceof Error &&
-      error.message.startsWith(`Failed to parse config file '${configPath}' (label: local)`)
-    ) {
-      throw new Error(`Invalid faceted config file: ${configPath}`);
+    if (hasErrorCode(error)) {
+      throw error;
     }
-    throw error;
+    throw new Error(`Invalid faceted config file: ${configPath}`);
   }
 
-  assertConfigRootIsObject(configPath);
-
-  const validationIssues = resolver.validate();
+  const validationIssues: ValidateError[] = resolver.validate();
   if (validationIssues.length > 0) {
-    const invalidField = getInvalidFieldFromValidationIssue(validationIssues[0]);
+    const invalidField = validationIssues[0]?.key;
     if (invalidField) {
       throw new Error(`Invalid faceted config field: ${invalidField}`);
     }

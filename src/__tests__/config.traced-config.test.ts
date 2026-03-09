@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import * as fs from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -11,118 +11,121 @@ type ConfigModule = {
   }>;
 };
 
-type ResolverMock = {
-  addParser: ReturnType<typeof vi.fn>;
-  addFormat: ReturnType<typeof vi.fn>;
-  loadFile: ReturnType<typeof vi.fn>;
-  validate: ReturnType<typeof vi.fn>;
-  get: ReturnType<typeof vi.fn>;
-};
-
-function createResolverMock(): ResolverMock {
-  return {
-    addParser: vi.fn(),
-    addFormat: vi.fn(),
-    loadFile: vi.fn(),
-    validate: vi.fn(),
-    get: vi.fn(),
-  };
-}
-
-async function loadConfigModuleWithResolver(resolver: ResolverMock): Promise<ConfigModule> {
-  const tracedConfigMock = vi.fn(() => resolver);
-  vi.resetModules();
-  vi.doMock('traced-config', () => ({ tracedConfig: tracedConfigMock }));
-
+async function loadConfigModule(): Promise<ConfigModule> {
   const modulePath = pathToFileURL(resolve('src/config/index.ts')).href;
-  const cacheKey = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const module = await import(`${modulePath}?case=${cacheKey}`);
-  return module as ConfigModule;
+  return import(modulePath) as Promise<ConfigModule>;
 }
 
 function writeConfig(homeDir: string, body: string): string {
   const facetedRoot = join(homeDir, '.faceted');
-  mkdirSync(facetedRoot, { recursive: true });
+  fs.mkdirSync(facetedRoot, { recursive: true });
   const configPath = join(facetedRoot, 'config.yaml');
-  writeFileSync(configPath, body, 'utf-8');
+  fs.writeFileSync(configPath, body, 'utf-8');
   return configPath;
 }
 
-describe('readFacetedConfig with traced-config error handling', () => {
+describe('readFacetedConfig traced-config integration', () => {
   const tempDirs: string[] = [];
 
   afterEach(() => {
-    vi.doUnmock('traced-config');
+    vi.restoreAllMocks();
+    vi.doUnmock('yaml');
     vi.resetModules();
     for (const dir of tempDirs) {
-      rmSync(dir, { recursive: true, force: true });
+      fs.rmSync(dir, { recursive: true, force: true });
     }
   });
 
-  it('should normalize parse errors even when traced-config message has extra details', async () => {
-    const homeDir = mkdtempSync(join(tmpdir(), 'faceted-config-mock-'));
+  it('loads a valid object-root yaml file', async () => {
+    const homeDir = fs.mkdtempSync(join(tmpdir(), 'faceted-config-real-'));
     tempDirs.push(homeDir);
-    const configPath = writeConfig(homeDir, 'version: [1\n');
+    writeConfig(homeDir, 'version: 2\nskillPaths:\n  - /skills/custom\n');
 
-    const resolver = createResolverMock();
-    resolver.loadFile.mockRejectedValue(
-      new Error(`Failed to parse config file '${configPath}' (label: local): yaml parser detail`),
-    );
+    const { readFacetedConfig } = await loadConfigModule();
+    const config = await readFacetedConfig(homeDir);
 
-    const { readFacetedConfig } = await loadConfigModuleWithResolver(resolver);
+    expect(config).toEqual({
+      version: 2,
+      skillPaths: ['/skills/custom'],
+    });
+  });
+
+  it('fails when yaml root is an array', async () => {
+    const homeDir = fs.mkdtempSync(join(tmpdir(), 'faceted-config-real-'));
+    tempDirs.push(homeDir);
+    const configPath = writeConfig(homeDir, '- item\n');
+
+    const { readFacetedConfig } = await loadConfigModule();
 
     await expect(readFacetedConfig(homeDir)).rejects.toThrow(
       `Invalid faceted config file: ${configPath}`,
     );
-    expect(resolver.addParser).not.toHaveBeenCalled();
-    expect(resolver.addFormat).toHaveBeenCalledWith('string-list', expect.any(Function));
   });
 
-  it('should throw invalid field error when traced-config validate reports schema issues', async () => {
-    const homeDir = mkdtempSync(join(tmpdir(), 'faceted-config-mock-'));
+  it('fails when yaml root is a scalar', async () => {
+    const homeDir = fs.mkdtempSync(join(tmpdir(), 'faceted-config-real-'));
     tempDirs.push(homeDir);
-    writeConfig(homeDir, 'version: 1\nskillPaths:\n  - /skills/custom\n');
+    const configPath = writeConfig(homeDir, 'hello\n');
 
-    const resolver = createResolverMock();
-    resolver.loadFile.mockResolvedValue(undefined);
-    resolver.validate.mockReturnValue([{ key: 'skillPaths' }]);
-    resolver.get.mockImplementation((key: string) => {
-      if (key === 'version') {
-        return 1;
-      }
-      if (key === 'skillPaths') {
-        return ['/skills/custom'];
-      }
-      return undefined;
-    });
+    const { readFacetedConfig } = await loadConfigModule();
 
-    const { readFacetedConfig } = await loadConfigModuleWithResolver(resolver);
+    await expect(readFacetedConfig(homeDir)).rejects.toThrow(
+      `Invalid faceted config file: ${configPath}`,
+    );
+  });
+
+  it('returns invalid field using validation issue key', async () => {
+    const homeDir = fs.mkdtempSync(join(tmpdir(), 'faceted-config-real-'));
+    tempDirs.push(homeDir);
+    writeConfig(homeDir, 'version: 1\nskillPaths:\n  - 100\n');
+
+    const { readFacetedConfig } = await loadConfigModule();
 
     await expect(readFacetedConfig(homeDir)).rejects.toThrow(
       'Invalid faceted config field: skillPaths',
     );
   });
 
-  it('should throw a generic field error when validate reports an issue without key metadata', async () => {
-    const homeDir = mkdtempSync(join(tmpdir(), 'faceted-config-mock-'));
+  it('fails when yaml is malformed', async () => {
+    const homeDir = fs.mkdtempSync(join(tmpdir(), 'faceted-config-real-'));
     tempDirs.push(homeDir);
-    writeConfig(homeDir, 'version: 1\nskillPaths:\n  - /skills/custom\n');
+    const configPath = writeConfig(homeDir, 'version: [1\n');
 
-    const resolver = createResolverMock();
-    resolver.loadFile.mockResolvedValue(undefined);
-    resolver.validate.mockReturnValue([{}]);
-    resolver.get.mockImplementation((key: string) => {
-      if (key === 'version') {
-        return 1;
-      }
-      if (key === 'skillPaths') {
-        return ['/skills/custom'];
-      }
-      return undefined;
+    const { readFacetedConfig } = await loadConfigModule();
+
+    await expect(readFacetedConfig(homeDir)).rejects.toThrow(
+      `Invalid faceted config file: ${configPath}`,
+    );
+  });
+
+  it('uses a single file read during one config load', async () => {
+    const homeDir = fs.mkdtempSync(join(tmpdir(), 'faceted-config-real-'));
+    tempDirs.push(homeDir);
+    const configPath = writeConfig(homeDir, 'version: 2\nskillPaths:\n  - /skills/custom\n');
+
+    let parseCallCount = 0;
+    vi.resetModules();
+    vi.doMock('yaml', async () => {
+      const actual = await vi.importActual<typeof import('yaml')>('yaml');
+      return {
+        ...actual,
+        parse: (...args: Parameters<typeof actual.parse>) => {
+          parseCallCount += 1;
+          if (parseCallCount === 1) {
+            fs.writeFileSync(configPath, '- broken-after-first-read\n', 'utf-8');
+          }
+          return actual.parse(...args);
+        },
+      };
     });
 
-    const { readFacetedConfig } = await loadConfigModuleWithResolver(resolver);
+    const { readFacetedConfig } = await loadConfigModule();
+    const config = await readFacetedConfig(homeDir);
 
-    await expect(readFacetedConfig(homeDir)).rejects.toThrow('Invalid faceted config field');
+    expect(config).toEqual({
+      version: 2,
+      skillPaths: ['/skills/custom'],
+    });
+    expect(parseCallCount).toBe(1);
   });
 });
