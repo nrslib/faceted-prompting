@@ -131,6 +131,25 @@ describe('facet compose integration flow', () => {
     })).rejects.toThrow('Unsupported command: (none)');
   });
 
+  it('should fail compose command when config file is malformed', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    const facetedRoot = join(homeDir, '.faceted');
+    mkdirSync(facetedRoot, { recursive: true });
+    const configPath = join(facetedRoot, 'config.yaml');
+    writeFileSync(configPath, 'version: [1\n', 'utf-8');
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli(['compose'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: async () => 'unused',
+      input: async (_prompt, defaultValue) => defaultValue,
+    })).rejects.toThrow(`Invalid faceted config file: ${configPath}`);
+  });
+
   it('should initialize faceted home on first run and write output to cwd when input is blank', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
