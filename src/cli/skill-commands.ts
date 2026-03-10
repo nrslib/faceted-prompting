@@ -1,5 +1,4 @@
-import { basename } from 'node:path';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import { loadComposeDefinition } from '../compose-definition.js';
 import { getFacetedRoot } from '../config/index.js';
 import {
@@ -13,16 +12,8 @@ import { buildInstalledSkillLabels, readSkillsRegistry, writeSkillsRegistry } fr
 import { removeSkillFile, writeSkillFile } from './skill-file-ops.js';
 import type { SkillEntry, SkillMode, SkillsRegistry } from './skill-types.js';
 import type { FacetCliOptions, FacetCliResult } from './types.js';
-
-function ensureSkillModeFromLabel(modeLabel: string): SkillMode {
-  if (modeLabel === 'Inline') {
-    return 'inline';
-  }
-  if (modeLabel === 'Reference') {
-    return 'reference';
-  }
-  throw new Error(`Unsupported skill mode: ${modeLabel}`);
-}
+import { runFilePlacementInstall, runSkillDeployInstall, runTemplateApplyInstall } from './install-skill/modes.js';
+import { dispatchInstallFlow, ensureInstallFlowSelection } from './install-skill/flow.js';
 
 function resolveTargetModeFromDecision(modeDecision: string): SkillMode | undefined {
   if (modeDecision === 'Keep current') {
@@ -37,17 +28,6 @@ function resolveTargetModeFromDecision(modeDecision: string): SkillMode | undefi
   throw new Error(`Unsupported skill mode decision: ${modeDecision}`);
 }
 
-function resolveInstallTarget(targetLabel: string): 'cc' {
-  if (targetLabel === 'Claude Code') {
-    return 'cc';
-  }
-  throw new Error(`Unsupported skill target: ${targetLabel}`);
-}
-
-function defaultOutputPath(homeDir: string, skillName: string): string {
-  return join(homeDir, '.claude', 'skills', skillName, 'SKILL.md');
-}
-
 export function getSkillPaths(homeDir: string): {
   readonly facetedRoot: string;
   readonly facetsRoot: string;
@@ -56,7 +36,6 @@ export function getSkillPaths(homeDir: string): {
 } {
   const facetedRoot = getFacetedRoot(homeDir);
   const facetsRoot = join(facetedRoot, 'facets');
-
   return {
     facetedRoot,
     facetsRoot,
@@ -90,7 +69,7 @@ async function generateAndWriteSkill(params: {
 }
 
 export async function runInstallSkillCommand(options: FacetCliOptions): Promise<FacetCliResult> {
-  const { facetsRoot, compositionsDir, skillsPath } = getSkillPaths(options.homeDir);
+  const { facetedRoot, facetsRoot, compositionsDir, skillsPath } = getSkillPaths(options.homeDir);
   const registry = readSkillsRegistry(skillsPath);
 
   const definitionMap = listCompositionDefinitions(compositionsDir);
@@ -105,49 +84,69 @@ export async function runInstallSkillCommand(options: FacetCliOptions): Promise<
     throw new Error(`Unknown compose definition selected: ${selectedComposition}`);
   }
 
-  const targetLabel = await options.select(['Claude Code', 'Cursor', 'Cline']);
-  const target = resolveInstallTarget(targetLabel);
-
-  const modeLabel = await options.select(['Inline', 'Reference']);
-  const mode = ensureSkillModeFromLabel(modeLabel);
+  const installSelection = ensureInstallFlowSelection(
+    await options.select(['Skill deploy', 'File placement', 'Template apply']),
+  );
 
   const definition = await loadComposeDefinition(definitionPath);
   const source = basename(definitionPath);
   const safeSkillName = ensureSafeDefinitionName(definition.name);
-  const defaultPath = defaultOutputPath(options.homeDir, safeSkillName);
-  const outputPath = resolve(await options.input('Output path', defaultPath));
-
-  await generateAndWriteSkill({
-    entry: {
-      source,
-      mode,
-      outputPath,
-    },
-    compositionsDir,
+  const definitionDir = dirname(definitionPath);
+  const sections = buildSkillSections({
+    definition,
+    definitionDir,
     facetsRoot,
-    homeDir: options.homeDir,
+  });
+  let result: FacetCliResult | undefined;
+
+  await dispatchInstallFlow({
+    selection: installSelection,
+    onFilePlacement: async () => {
+      result = await runFilePlacementInstall({
+        options,
+        safeSkillName,
+        sections,
+      });
+    },
+    onTemplateApply: async () => {
+      result = await runTemplateApplyInstall({
+        options,
+        safeSkillName,
+        sections,
+      });
+    },
+    onSkillDeploy: async () => {
+      const deploy = await runSkillDeployInstall({
+        options,
+        facetedRoot,
+        safeSkillName,
+        definition,
+        sections,
+      });
+
+      const targetEntries = registry[deploy.target] ?? {};
+      const updatedTargetEntries = {
+        ...targetEntries,
+        [safeSkillName]: {
+          source,
+          mode: deploy.mode,
+          output: deploy.outputPath,
+          cc: { 'user-invocable': true },
+        },
+      };
+      const updatedRegistry = {
+        ...registry,
+        [deploy.target]: updatedTargetEntries,
+      };
+      writeSkillsRegistry(skillsPath, updatedRegistry, options.homeDir);
+      result = deploy.result;
+    },
   });
 
-  const targetEntries = registry[target] ?? {};
-  const updatedTargetEntries = {
-    ...targetEntries,
-    [safeSkillName]: {
-      source,
-      mode,
-      output: outputPath,
-      cc: { 'user-invocable': true },
-    },
-  };
-  const updatedRegistry = {
-    ...registry,
-    [target]: updatedTargetEntries,
-  };
-
-  writeSkillsRegistry(skillsPath, updatedRegistry, options.homeDir);
-  return {
-    kind: 'path',
-    path: outputPath,
-  };
+  if (!result) {
+    throw new Error(`Unsupported install flow selection: ${installSelection}`);
+  }
+  return result;
 }
 
 export async function runUpdateSkillCommand(options: FacetCliOptions): Promise<FacetCliResult> {

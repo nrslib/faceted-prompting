@@ -28,7 +28,9 @@ export async function initializeFacetedHome(options: { homeDir: string }): Promi
   ensureConfigFile(options.homeDir);
 
   const facetsRoot = join(facetedRoot, 'facets');
+  const templatesRoot = join(facetedRoot, 'templates');
   mkdirSync(facetsRoot, { recursive: true });
+  mkdirSync(templatesRoot, { recursive: true });
 
   for (const dirName of REQUIRED_FACET_DIRS) {
     mkdirSync(join(facetsRoot, dirName), { recursive: true });

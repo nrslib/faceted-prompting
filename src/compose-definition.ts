@@ -6,6 +6,7 @@ const ALLOWED_COMPOSE_KEYS = new Set([
   'name',
   'description',
   'persona',
+  'template',
   'knowledge',
   'policies',
   'instruction',
@@ -85,6 +86,7 @@ export async function loadComposeDefinition(definitionPath: string): Promise<Com
   const name = ensureRequiredString(parsed.name, 'name');
   const persona = ensureRequiredString(parsed.persona, 'persona');
   const description = ensureOptionalString(parsed.description, 'description');
+  const template = ensureOptionalString(parsed.template, 'template');
   const instruction = ensureOptionalString(parsed.instruction, 'instruction');
 
   const knowledge = ensureStringList(parsed.knowledge, 'knowledge');
@@ -96,6 +98,7 @@ export async function loadComposeDefinition(definitionPath: string): Promise<Com
     name,
     description: toOptionalNonEmpty(description),
     persona,
+    template: toOptionalNonEmpty(template),
     knowledge: knowledge && knowledge.length > 0 ? knowledge : undefined,
     policies: policies && policies.length > 0 ? policies : undefined,
     instruction: toOptionalNonEmpty(instruction),
