@@ -33,6 +33,7 @@ describe('initializeFacetedHome', () => {
     expect(existsSync(join(homeDir, '.faceted', 'facets', 'knowledge'))).toBe(true);
     expect(existsSync(join(homeDir, '.faceted', 'facets', 'policies'))).toBe(true);
     expect(existsSync(join(homeDir, '.faceted', 'facets', 'compositions'))).toBe(true);
+    expect(existsSync(join(homeDir, '.faceted', 'templates'))).toBe(true);
   });
 
   it('should create default templates on first run', async () => {
@@ -79,6 +80,7 @@ describe('initializeFacetedHome', () => {
     writeFileSync(configPath, customConfig, 'utf-8');
     await initializeFacetedHome({ homeDir });
     expect(readFileSync(configPath, 'utf-8')).toContain('/tmp/custom-skill');
+    expect(existsSync(join(homeDir, '.faceted', 'templates'))).toBe(true);
   });
 
   it('should not overwrite existing templates on re-run', async () => {

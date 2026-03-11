@@ -9,6 +9,7 @@ type ComposeDefinitionModule = {
     name: string;
     description?: string;
     persona: string;
+    template?: string;
     knowledge?: string[];
     policies?: string[];
     instruction?: string;
@@ -112,6 +113,46 @@ describe('loadComposeDefinition', () => {
     const loaded = await loadComposeDefinition(definitionPath);
     expect(loaded.instruction).toContain('Keep implementation simple.');
     expect(loaded.instruction).toContain('Avoid fallback defaults.');
+  });
+
+  it('should parse optional template field', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'facet-compose-def-'));
+    tempDirs.push(root);
+
+    const definitionPath = join(root, 'definition.yaml');
+    writeFileSync(
+      definitionPath,
+      [
+        'name: template-based',
+        'persona: coder',
+        'template: starter-kit',
+      ].join('\n'),
+      'utf-8',
+    );
+
+    const { loadComposeDefinition } = await loadComposeDefinitionModule();
+    const loaded = await loadComposeDefinition(definitionPath);
+    expect(loaded.template).toBe('starter-kit');
+  });
+
+  it('should reject non-string template field', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'facet-compose-def-'));
+    tempDirs.push(root);
+
+    const definitionPath = join(root, 'definition.yaml');
+    writeFileSync(
+      definitionPath,
+      [
+        'name: template-based',
+        'persona: coder',
+        'template:',
+        '  key: value',
+      ].join('\n'),
+      'utf-8',
+    );
+
+    const { loadComposeDefinition } = await loadComposeDefinitionModule();
+    await expect(loadComposeDefinition(definitionPath)).rejects.toThrow('template must be a scalar string');
   });
 
   it('should reject unknown compose definition keys', async () => {

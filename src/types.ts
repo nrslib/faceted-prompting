@@ -54,6 +54,7 @@ export interface ComposeDefinition {
   readonly name: string;
   readonly description?: string;
   readonly persona: string;
+  readonly template?: string;
   readonly knowledge?: readonly string[];
   readonly policies?: readonly string[];
   readonly instruction?: string;

@@ -114,7 +114,7 @@ describe('facet skill integration flow', () => {
     await runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['coding', 'Claude Code', 'Inline']),
+      select: createSelectStub(['coding', 'Skill deploy', 'Claude Code', 'Inline']),
       input: async (prompt, defaultValue) => {
         if (prompt.toLowerCase().includes('output')) {
           return skillOutputPath;
@@ -158,7 +158,7 @@ describe('facet skill integration flow', () => {
     const result = await runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['coding', 'Claude Code', 'Inline']),
+      select: createSelectStub(['coding', 'Skill deploy', 'Claude Code', 'Inline']),
       input: async (_prompt, defaultValue) => defaultValue,
     });
 
@@ -178,19 +178,20 @@ describe('facet skill integration flow', () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
-    const { facetsRoot } = createFacetedFixture(homeDir);
+    createFacetedFixture(homeDir);
 
     const skillOutputPath = join(homeDir, '.claude', 'skills', 'coding', 'SKILL.md');
-    const expectedPersonaPath = join(facetsRoot, 'persona', 'coder.md');
-    const expectedPolicyPath = join(facetsRoot, 'policies', 'coding.md');
-    const expectedKnowledgePath = join(facetsRoot, 'knowledge', 'architecture.md');
+    const skillRoot = dirname(skillOutputPath);
+    const expectedPersonaPath = join(skillRoot, 'facets', 'persona', 'coder.md');
+    const expectedPolicyPath = join(skillRoot, 'facets', 'policies', 'coding.md');
+    const expectedKnowledgePath = join(skillRoot, 'facets', 'knowledge', 'architecture.md');
 
     const { runFacetCli } = await loadCliModule();
 
     await runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['coding', 'Claude Code', 'Reference']),
+      select: createSelectStub(['coding', 'Skill deploy', 'Claude Code', 'Reference']),
       input: async (prompt, defaultValue) => {
         if (prompt.toLowerCase().includes('output')) {
           return skillOutputPath;
@@ -339,20 +340,44 @@ describe('facet skill integration flow', () => {
     expect(existsSync(skillOutputPath)).toBe(false);
   });
 
-  it('should reject install when unsupported target is selected', async () => {
+  it('should present only supported targets in skill deploy mode', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
     createFacetedFixture(homeDir);
+    const skillOutputPath = join(homeDir, '.claude', 'skills', 'coding', 'SKILL.md');
 
     const { runFacetCli } = await loadCliModule();
 
-    await expect(runFacetCli(['install', 'skill'], {
+    let selectCallCount = 0;
+    const select = async (candidates: string[]): Promise<string> => {
+      selectCallCount += 1;
+      if (selectCallCount === 1) {
+        expect(candidates).toContain('coding');
+        return 'coding';
+      }
+      if (selectCallCount === 2) {
+        expect(candidates).toContain('Skill deploy');
+        return 'Skill deploy';
+      }
+      if (selectCallCount === 3) {
+        expect(candidates).toEqual(['Claude Code']);
+        return 'Claude Code';
+      }
+      if (selectCallCount === 4) {
+        expect(candidates).toContain('Inline');
+        return 'Inline';
+      }
+      throw new Error(`Unexpected select call: ${candidates.join(', ')}`);
+    };
+
+    await runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['coding', 'Cursor', 'Inline']),
-      input: async (_prompt, defaultValue) => defaultValue,
-    })).rejects.toThrow('Unsupported skill target: Cursor');
+      select,
+      input: async (prompt, defaultValue) =>
+        prompt.toLowerCase().includes('output') ? skillOutputPath : defaultValue,
+    });
   });
 
   it('should reject install when compose definition name is unsafe', async () => {
@@ -375,7 +400,7 @@ describe('facet skill integration flow', () => {
     await expect(runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['unsafe', 'Claude Code', 'Inline']),
+      select: createSelectStub(['unsafe', 'Skill deploy', 'Claude Code', 'Inline']),
       input: async (_prompt, defaultValue) => defaultValue,
     })).rejects.toThrow('Invalid compose definition name: ../unsafe');
   });
@@ -392,7 +417,7 @@ describe('facet skill integration flow', () => {
     await expect(runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['coding', 'Claude Code', 'Inline']),
+      select: createSelectStub(['coding', 'Skill deploy', 'Claude Code', 'Inline']),
       input: async (prompt, defaultValue) =>
         prompt.toLowerCase().includes('output') ? outsidePath : defaultValue,
     })).rejects.toThrow(`Skill output path must be inside home directory: ${outsidePath}`);
@@ -415,7 +440,7 @@ describe('facet skill integration flow', () => {
     await expect(runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['coding', 'Claude Code', 'Inline']),
+      select: createSelectStub(['coding', 'Skill deploy', 'Claude Code', 'Inline']),
       input: async (prompt, defaultValue) =>
         prompt.toLowerCase().includes('output') ? symlinkPath : defaultValue,
     })).rejects.toThrow(`Symbolic links are not allowed for skill output file: ${symlinkPath}`);
@@ -438,7 +463,7 @@ describe('facet skill integration flow', () => {
     await expect(runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['coding', 'Claude Code', 'Inline']),
+      select: createSelectStub(['coding', 'Skill deploy', 'Claude Code', 'Inline']),
       input: async (_prompt, defaultValue) => defaultValue,
     })).rejects.toThrow(
       `Symbolic links are not allowed for skills registry file: ${registrySymlinkPath}`,
