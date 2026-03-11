@@ -97,19 +97,17 @@ export async function runInstallSkillCommand(options: FacetCliOptions): Promise<
     definitionDir,
     facetsRoot,
   });
-  let result: FacetCliResult | undefined;
-
-  await dispatchInstallFlow({
+  return dispatchInstallFlow<FacetCliResult>({
     selection: installSelection,
-    onFilePlacement: async () => {
-      result = await runFilePlacementInstall({
+    onFilePlacement: () => {
+      return runFilePlacementInstall({
         options,
         safeSkillName,
         sections,
       });
     },
-    onTemplateApply: async () => {
-      result = await runTemplateApplyInstall({
+    onTemplateApply: () => {
+      return runTemplateApplyInstall({
         options,
         safeSkillName,
         sections,
@@ -139,14 +137,9 @@ export async function runInstallSkillCommand(options: FacetCliOptions): Promise<
         [deploy.target]: updatedTargetEntries,
       };
       writeSkillsRegistry(skillsPath, updatedRegistry, options.homeDir);
-      result = deploy.result;
+      return deploy.result;
     },
   });
-
-  if (!result) {
-    throw new Error(`Unsupported install flow selection: ${installSelection}`);
-  }
-  return result;
 }
 
 export async function runUpdateSkillCommand(options: FacetCliOptions): Promise<FacetCliResult> {

@@ -3,6 +3,7 @@ import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } fro
 import type { buildSkillSections } from '../skill-renderer.js';
 
 const FACET_TOKEN_PATTERN = /{{facet:(persona|knowledges|policies|instructions)}}/g;
+const FACET_TOKEN_TEST = /{{facet:(persona|knowledges|policies|instructions)}}/;
 
 type FacetPlaceholderKey = 'persona' | 'knowledges' | 'policies' | 'instructions';
 
@@ -169,8 +170,9 @@ export function applyFacetTokensToPath(params: {
   rootDir: string;
   maxDepth: number;
   facets: FacetPathMap;
+  excludeDirs: readonly string[];
 }): void {
-  const { rootDir, maxDepth, facets } = params;
+  const { rootDir, maxDepth, facets, excludeDirs } = params;
 
   const visit = (currentDir: string, depth: number): void => {
     for (const entry of readdirSync(currentDir, { withFileTypes: true })) {
@@ -180,6 +182,9 @@ export function applyFacetTokensToPath(params: {
 
       const entryPath = join(currentDir, entry.name);
       if (entry.isDirectory()) {
+        if (currentDir === rootDir && excludeDirs.includes(entry.name)) {
+          continue;
+        }
         if (depth < maxDepth) {
           visit(entryPath, depth + 1);
         }
@@ -191,11 +196,9 @@ export function applyFacetTokensToPath(params: {
       }
 
       const original = readFileSync(entryPath, 'utf-8');
-      if (!FACET_TOKEN_PATTERN.test(original)) {
-        FACET_TOKEN_PATTERN.lastIndex = 0;
+      if (!FACET_TOKEN_TEST.test(original)) {
         continue;
       }
-      FACET_TOKEN_PATTERN.lastIndex = 0;
 
       const replaced = replaceFacetTokens(original, facets);
       if (replaced !== original) {

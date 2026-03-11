@@ -6,7 +6,7 @@ import {
   readdirSync,
   rmSync,
 } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { join } from 'node:path';
 import { ensurePathAncestorsAndRealPathWithinHome, ensurePathWithinRoots } from '../path-guard.js';
 import type { FacetCliOptions } from '../types.js';
 
@@ -77,25 +77,12 @@ export function copyDirectoryTree(sourceDir: string, targetDir: string): void {
     }
 
     if (entry.isFile()) {
-      mkdirSync(dirname(targetPath), { recursive: true });
       copyFileSync(sourcePath, targetPath);
     }
   }
 }
 
-function ensureDeletePathSafety(params: {
-  targetDir: string;
-  promptLabel: string;
-  homeDir?: string;
-}): void {
-  if (!params.homeDir) {
-    return;
-  }
-
-  ensurePathAncestorsAndRealPathWithinHome(params.targetDir, params.homeDir, params.promptLabel);
-}
-
-function ensureCreatePathSafety(params: {
+function ensurePathSafety(params: {
   targetDir: string;
   promptLabel: string;
   homeDir?: string;
@@ -120,13 +107,12 @@ export async function ensureRegenerationTargetDir(params: {
     if (!shouldOverwrite(overwriteAnswer)) {
       throw new Error(`${promptLabel} exists and overwrite was cancelled: ${targetDir}`);
     }
-    ensureDeletePathSafety(params);
+    ensurePathSafety(params);
     rmSync(targetDir, { recursive: true, force: true });
   }
 
-  ensureCreatePathSafety(params);
+  ensurePathSafety(params);
   mkdirSync(targetDir, { recursive: true });
-  ensureCreatePathSafety(params);
 }
 
 export function ensureDirectoryExists(path: string, label: string): void {
@@ -135,21 +121,19 @@ export function ensureDirectoryExists(path: string, label: string): void {
   }
 }
 
-export async function dispatchInstallFlow(params: {
+export async function dispatchInstallFlow<T>(params: {
   selection: InstallFlowSelection;
-  onSkillDeploy: () => Promise<void>;
-  onFilePlacement: () => Promise<void>;
-  onTemplateApply: () => Promise<void>;
-}): Promise<void> {
+  onSkillDeploy: () => Promise<T>;
+  onFilePlacement: () => Promise<T>;
+  onTemplateApply: () => Promise<T>;
+}): Promise<T> {
   if (params.selection === 'File placement') {
-    await params.onFilePlacement();
-    return;
+    return params.onFilePlacement();
   }
 
   if (params.selection === 'Template apply') {
-    await params.onTemplateApply();
-    return;
+    return params.onTemplateApply();
   }
 
-  await params.onSkillDeploy();
+  return params.onSkillDeploy();
 }

@@ -532,6 +532,87 @@ describe('facet install 3-mode integration flow', () => {
     expect(readFileSync(copiedTemplateReadme, 'utf-8')).toBe('template file');
   });
 
+  it('should not replace facet tokens inside copied facets directory in template apply mode', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    createFacetedFixture(homeDir);
+
+    const facetsRoot = join(homeDir, '.faceted', 'facets');
+    writeFileSync(
+      join(facetsRoot, 'persona', 'coder.md'),
+      'You are a coding agent. Ref={{facet:persona}}',
+      'utf-8',
+    );
+
+    const targetDir = join(workspaceDir, 'template-apply-facets-exclusion');
+    mkdirSync(targetDir, { recursive: true });
+    writeFileSync(join(targetDir, 'root.md'), 'persona={{facet:persona}}', 'utf-8');
+
+    const { runFacetCli } = await loadCliModule();
+
+    await runFacetCli(['install', 'skill'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['plain', 'Template apply']),
+      input: async (prompt, defaultValue) => {
+        const normalized = prompt.toLowerCase();
+        if (normalized.includes('directory')) {
+          return targetDir;
+        }
+        if (normalized.includes('depth')) {
+          return '10';
+        }
+        return defaultValue;
+      },
+    });
+
+    const copiedPersona = readFileSync(
+      join(targetDir, 'facets', 'persona', 'coder.md'),
+      'utf-8',
+    );
+    expect(copiedPersona).toContain('{{facet:persona}}');
+
+    const rootAfter = readFileSync(join(targetDir, 'root.md'), 'utf-8');
+    expect(rootAfter).toContain('/facets/persona/coder.md');
+    expect(rootAfter).not.toContain('{{facet:persona}}');
+  });
+
+  it('should not replace facet tokens inside copied facets directory in skill deploy mode with template', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    createFacetedFixture(homeDir);
+
+    const facetsRoot = join(homeDir, '.faceted', 'facets');
+    writeFileSync(
+      join(facetsRoot, 'persona', 'coder.md'),
+      'You are a coding agent. Ref={{facet:persona}}',
+      'utf-8',
+    );
+
+    const targetSkillPath = join(homeDir, '.claude', 'skills', 'templated-skill', 'SKILL.md');
+    const { runFacetCli } = await loadCliModule();
+
+    await runFacetCli(['install', 'skill'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['templated', 'Skill deploy', 'Claude Code', 'Reference']),
+      input: async (prompt, defaultValue) => {
+        if (prompt.toLowerCase().includes('output')) {
+          return targetSkillPath;
+        }
+        return defaultValue;
+      },
+    });
+
+    const copiedPersona = readFileSync(
+      join(dirname(targetSkillPath), 'facets', 'persona', 'coder.md'),
+      'utf-8',
+    );
+    expect(copiedPersona).toContain('{{facet:persona}}');
+  });
+
   it('should fail fast when instructions placeholder exists but instruction facet is undefined', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));

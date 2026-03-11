@@ -71,6 +71,7 @@ export async function runTemplateApplyInstall(params: {
     rootDir: targetDir,
     maxDepth: scanDepth,
     facets: facetPaths,
+    excludeDirs: ['facets'],
   });
 
   return {
@@ -86,13 +87,9 @@ export async function runSkillDeployInstall(params: {
   definition: ComposeDefinition;
   sections: SkillSections;
 }): Promise<{ result: FacetCliResult; mode: 'inline' | 'reference'; outputPath: string; target: 'cc' }> {
-  let mode: 'inline' | 'reference' = 'reference';
   const targetLabel = await params.options.select(['Claude Code']);
-  if (targetLabel === 'Claude Code') {
-    mode = ensureSkillModeFromLabel(await params.options.select(['Inline', 'Reference']));
-  }
-
   const target = resolveInstallTarget(targetLabel);
+  const mode = ensureSkillModeFromLabel(await params.options.select(['Inline', 'Reference']));
   const defaultPath = defaultOutputPath(params.options.homeDir, params.safeSkillName);
   const outputPath = resolve(await params.options.input('Output path', defaultPath));
   const { resolvedPath: boundedOutputPath } = ensurePathWithinHome(
@@ -130,6 +127,7 @@ export async function runSkillDeployInstall(params: {
       rootDir: targetDir,
       maxDepth: Number.MAX_SAFE_INTEGER,
       facets: facetPaths,
+      excludeDirs: ['facets'],
     });
 
     if (!existsSync(boundedOutputPath)) {

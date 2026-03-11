@@ -14,11 +14,7 @@ import {
   runUpdateSkillCommand,
 } from './skill-commands.js';
 import type { FacetCliOptions, FacetCliResult } from './types.js';
-
-function shouldOverwrite(answer: string): boolean {
-  const normalized = answer.trim().toLowerCase();
-  return normalized === 'y' || normalized === 'yes';
-}
+import { shouldOverwrite } from './install-skill/flow.js';
 
 function ensureCommand(command: string | undefined): string {
   if (!command) {
