@@ -45,7 +45,7 @@ function createFacetedFixture(homeDir: string): {
 } {
   const facetedRoot = join(homeDir, '.faceted');
   const facetsRoot = join(facetedRoot, 'facets');
-  const compositionsRoot = join(facetsRoot, 'compositions');
+  const compositionsRoot = join(facetedRoot, 'compositions');
   const templatesRoot = join(facetedRoot, 'templates');
 
   mkdirSync(join(facetsRoot, 'persona'), { recursive: true });

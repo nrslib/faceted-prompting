@@ -16,9 +16,20 @@ import {
 import type { FacetCliOptions, FacetCliResult } from './types.js';
 import { shouldOverwrite } from './install-skill/flow.js';
 
+const USAGE = [
+  'Usage: facet <command>',
+  '',
+  'Commands:',
+  '  compose              Compose facets into a prompt file',
+  '  install skill        Install a skill from a composition',
+  '  update skill         Update installed skill(s)',
+  '  uninstall skill      Uninstall an installed skill',
+  '  list skill           List installed skills',
+].join('\n');
+
 function ensureCommand(command: string | undefined): string {
   if (!command) {
-    throw new Error('Unsupported command: (none)');
+    throw new Error(USAGE);
   }
   return command;
 }
@@ -58,6 +69,9 @@ async function runComposeCommand(options: FacetCliOptions): Promise<FacetCliResu
     userMessageOrder: definition.order,
   });
 
+  const splitSelection = await options.select(['Combined (single file)', 'Split (system + user)']);
+  const splitSystem = splitSelection === 'Split (system + user)';
+
   const outputInput = await options.input('Output directory', options.cwd);
   const outputDir = resolveOutputDirectory(outputInput, options.cwd);
   const outputFileName = `${ensureSafeDefinitionName(definition.name)}.prompt.md`;
@@ -79,7 +93,7 @@ async function runComposeCommand(options: FacetCliOptions): Promise<FacetCliResu
   const outputPath = await writeComposeOutput({
     outputDir,
     fileName: outputFileName,
-    content: formatComposedOutput(composed),
+    content: formatComposedOutput(composed, splitSystem),
     overwrite,
   });
 

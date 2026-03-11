@@ -37,7 +37,7 @@ describe('facet compose integration flow', () => {
 
     const facetedRoot = join(homeDir, '.faceted');
     const facetsRoot = join(facetedRoot, 'facets');
-    const composeRoot = join(facetsRoot, 'compositions');
+    const composeRoot = join(facetedRoot, 'compositions');
 
     mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
     mkdirSync(join(facetsRoot, 'knowledge'), { recursive: true });
@@ -71,12 +71,17 @@ describe('facet compose integration flow', () => {
     mkdirSync(outputDir, { recursive: true });
 
     const { runFacetCli } = await loadCliModule();
+    let selectCallCount = 0;
     const result = await runFacetCli(['compose'], {
       cwd: workspaceDir,
       homeDir,
       select: async (candidates) => {
-        expect(candidates).toContain('release');
-        return 'release';
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          expect(candidates).toContain('release');
+          return 'release';
+        }
+        return 'Combined (single file)';
       },
       input: async (_prompt, defaultValue) => {
         expect(defaultValue).toBe(workspaceDir);
@@ -128,7 +133,7 @@ describe('facet compose integration flow', () => {
       homeDir,
       select: async () => 'unused',
       input: async (_prompt, defaultValue) => defaultValue,
-    })).rejects.toThrow('Unsupported command: (none)');
+    })).rejects.toThrow('Usage: facet <command>');
   });
 
   it('should fail compose command when config file is malformed', async () => {
@@ -156,12 +161,17 @@ describe('facet compose integration flow', () => {
     tempDirs.push(workspaceDir, homeDir);
 
     const { runFacetCli } = await loadCliModule();
+    let selectCallCount = 0;
     const result = await runFacetCli(['compose'], {
       cwd: workspaceDir,
       homeDir,
       select: async (candidates) => {
-        expect(candidates).toContain('default');
-        return 'default';
+        selectCallCount++;
+        if (selectCallCount === 1) {
+          expect(candidates).toContain('coding');
+          return 'coding';
+        }
+        return 'Split (system + user)';
       },
       input: async (_prompt, defaultValue) => {
         expect(defaultValue).toBe(workspaceDir);
@@ -174,11 +184,11 @@ describe('facet compose integration flow', () => {
     if (result.kind !== 'path') {
       throw new Error('Expected path result for compose command');
     }
-    expect(result.path).toBe(join(workspaceDir, 'default.prompt.md'));
+    expect(result.path).toBe(join(workspaceDir, 'coding.prompt.md'));
 
     const generated = readFileSync(result.path, 'utf-8');
     expect(generated).toContain('# System Prompt');
-    expect(generated).toContain('You are a helpful assistant.');
+    expect(generated).toContain('You are a helpful coding assistant.');
   });
 
   it('should reject when no compose definitions are available', async () => {
@@ -187,9 +197,11 @@ describe('facet compose integration flow', () => {
     tempDirs.push(workspaceDir, homeDir);
 
     const facetedRoot = join(homeDir, '.faceted');
-    const compositionsDir = join(facetedRoot, 'facets', 'compositions');
+    const compositionsDir = join(facetedRoot, 'compositions');
     mkdirSync(compositionsDir, { recursive: true });
-    mkdirSync(join(compositionsDir, 'default.yaml'), { recursive: true });
+    mkdirSync(join(compositionsDir, 'coding.yaml'), { recursive: true });
+    mkdirSync(join(compositionsDir, 'frontend.yaml'), { recursive: true });
+    mkdirSync(join(compositionsDir, 'backend.yaml'), { recursive: true });
     writeFileSync(join(facetedRoot, 'config.yaml'), 'version: 1\n', 'utf-8');
 
     const { runFacetCli } = await loadCliModule();
@@ -208,7 +220,7 @@ describe('facet compose integration flow', () => {
 
     const facetedRoot = join(homeDir, '.faceted');
     const facetsRoot = join(facetedRoot, 'facets');
-    const composeRoot = join(facetsRoot, 'compositions');
+    const composeRoot = join(facetedRoot, 'compositions');
     mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
     mkdirSync(composeRoot, { recursive: true });
 
@@ -239,7 +251,7 @@ describe('facet compose integration flow', () => {
 
     const facetedRoot = join(homeDir, '.faceted');
     const facetsRoot = join(facetedRoot, 'facets');
-    const composeRoot = join(facetsRoot, 'compositions');
+    const composeRoot = join(facetedRoot, 'compositions');
 
     mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
     mkdirSync(composeRoot, { recursive: true });
@@ -271,7 +283,7 @@ describe('facet compose integration flow', () => {
 
     const facetedRoot = join(homeDir, '.faceted');
     const facetsRoot = join(facetedRoot, 'facets');
-    const composeRoot = join(facetsRoot, 'compositions');
+    const composeRoot = join(facetedRoot, 'compositions');
     const outsideDir = mkdtempSync(join(tmpdir(), 'facet-outside-'));
     tempDirs.push(outsideDir);
 
@@ -306,7 +318,7 @@ describe('facet compose integration flow', () => {
 
     const facetedRoot = join(homeDir, '.faceted');
     const facetsRoot = join(facetedRoot, 'facets');
-    const composeRoot = join(facetsRoot, 'compositions');
+    const composeRoot = join(facetedRoot, 'compositions');
     const personaRoot = join(facetsRoot, 'persona');
 
     mkdirSync(personaRoot, { recursive: true });
@@ -341,7 +353,7 @@ describe('facet compose integration flow', () => {
 
     const facetedRoot = join(homeDir, '.faceted');
     const facetsRoot = join(facetedRoot, 'facets');
-    const composeRoot = join(facetsRoot, 'compositions');
+    const composeRoot = join(facetedRoot, 'compositions');
     mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
     mkdirSync(composeRoot, { recursive: true });
 
@@ -384,7 +396,7 @@ describe('facet compose integration flow', () => {
 
     const facetedRoot = join(homeDir, '.faceted');
     const facetsRoot = join(facetedRoot, 'facets');
-    const composeRoot = join(facetsRoot, 'compositions');
+    const composeRoot = join(facetedRoot, 'compositions');
     mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
     mkdirSync(composeRoot, { recursive: true });
 
@@ -432,7 +444,7 @@ describe('facet compose integration flow', () => {
 
     const facetedRoot = join(homeDir, '.faceted');
     const facetsRoot = join(facetedRoot, 'facets');
-    const composeRoot = join(facetsRoot, 'compositions');
+    const composeRoot = join(facetedRoot, 'compositions');
 
     mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
     mkdirSync(composeRoot, { recursive: true });
@@ -476,7 +488,7 @@ describe('facet compose integration flow', () => {
 
     const facetedRoot = join(homeDir, '.faceted');
     const facetsRoot = join(facetedRoot, 'facets');
-    const composeRoot = join(facetsRoot, 'compositions');
+    const composeRoot = join(facetedRoot, 'compositions');
 
     mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
     mkdirSync(composeRoot, { recursive: true });

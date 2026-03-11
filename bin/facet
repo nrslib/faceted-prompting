@@ -1,2 +1,2 @@
 #!/usr/bin/env node
-import('../dist/cli/runner.js');
+import('../dist/cli/runner.js').then(m => m.main(process.argv.slice(2)));

@@ -32,7 +32,7 @@ describe('initializeFacetedHome', () => {
     expect(existsSync(join(homeDir, '.faceted', 'facets', 'persona'))).toBe(true);
     expect(existsSync(join(homeDir, '.faceted', 'facets', 'knowledge'))).toBe(true);
     expect(existsSync(join(homeDir, '.faceted', 'facets', 'policies'))).toBe(true);
-    expect(existsSync(join(homeDir, '.faceted', 'facets', 'compositions'))).toBe(true);
+    expect(existsSync(join(homeDir, '.faceted', 'compositions'))).toBe(true);
     expect(existsSync(join(homeDir, '.faceted', 'templates'))).toBe(true);
   });
 
@@ -43,11 +43,12 @@ describe('initializeFacetedHome', () => {
     const { initializeFacetedHome } = await loadInitModule();
     await initializeFacetedHome({ homeDir });
 
-    const facetedRoot = join(homeDir, '.faceted', 'facets');
-    expect(existsSync(join(facetedRoot, 'persona', 'default.md'))).toBe(true);
-    expect(existsSync(join(facetedRoot, 'knowledge', 'default.md'))).toBe(true);
-    expect(existsSync(join(facetedRoot, 'policies', 'default.md'))).toBe(true);
-    expect(existsSync(join(facetedRoot, 'compositions', 'default.yaml'))).toBe(true);
+    const facetedRoot = join(homeDir, '.faceted');
+    const facetsRoot = join(facetedRoot, 'facets');
+    expect(existsSync(join(facetsRoot, 'persona', 'coder.md'))).toBe(true);
+    expect(existsSync(join(facetsRoot, 'knowledge', 'architecture.md'))).toBe(true);
+    expect(existsSync(join(facetsRoot, 'policies', 'coding.md'))).toBe(true);
+    expect(existsSync(join(facetedRoot, 'compositions', 'coding.yaml'))).toBe(true);
   });
 
   it('should initialize config with extensible skillPaths field', async () => {
@@ -90,7 +91,7 @@ describe('initializeFacetedHome', () => {
     const { initializeFacetedHome } = await loadInitModule();
     await initializeFacetedHome({ homeDir });
 
-    const personaTemplatePath = join(homeDir, '.faceted', 'facets', 'persona', 'default.md');
+    const personaTemplatePath = join(homeDir, '.faceted', 'facets', 'persona', 'coder.md');
     const customPersonaTemplate = 'Custom persona template';
     writeFileSync(personaTemplatePath, customPersonaTemplate, 'utf-8');
 

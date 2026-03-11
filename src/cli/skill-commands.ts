@@ -39,7 +39,7 @@ export function getSkillPaths(homeDir: string): {
   return {
     facetedRoot,
     facetsRoot,
-    compositionsDir: join(facetsRoot, 'compositions'),
+    compositionsDir: join(facetedRoot, 'compositions'),
     skillsPath: join(facetedRoot, 'skills.yaml'),
   };
 }
