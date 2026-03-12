@@ -92,6 +92,10 @@ function createSelectStub(expectedSelections: readonly string[]) {
   };
 }
 
+const INLINE_MODE_LABEL = 'Inline (embed facet contents into SKILL.md)';
+const REFERENCE_MODE_LABEL = 'Reference (write facet file paths into SKILL.md)';
+const SWITCH_TO_REFERENCE_LABEL = 'Switch to Reference (replace embedded contents with file paths)';
+
 describe('facet skill integration flow', () => {
   const tempDirs: string[] = [];
 
@@ -114,7 +118,7 @@ describe('facet skill integration flow', () => {
     await runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['coding', 'Skill deploy', 'Claude Code', 'Inline']),
+      select: createSelectStub(['coding', 'Skill deploy', 'Claude Code', INLINE_MODE_LABEL]),
       input: async (prompt, defaultValue) => {
         if (prompt.toLowerCase().includes('output')) {
           return skillOutputPath;
@@ -158,7 +162,7 @@ describe('facet skill integration flow', () => {
     const result = await runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['coding', 'Skill deploy', 'Claude Code', 'Inline']),
+      select: createSelectStub(['coding', 'Skill deploy', 'Claude Code', INLINE_MODE_LABEL]),
       input: async (_prompt, defaultValue) => defaultValue,
     });
 
@@ -191,7 +195,7 @@ describe('facet skill integration flow', () => {
     await runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['coding', 'Skill deploy', 'Claude Code', 'Reference']),
+      select: createSelectStub(['coding', 'Skill deploy', 'Claude Code', REFERENCE_MODE_LABEL]),
       input: async (prompt, defaultValue) => {
         if (prompt.toLowerCase().includes('output')) {
           return skillOutputPath;
@@ -245,7 +249,7 @@ describe('facet skill integration flow', () => {
     await runFacetCli(['update', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['All', 'Switch to Reference']),
+      select: createSelectStub(['All', SWITCH_TO_REFERENCE_LABEL]),
       input: async (_prompt, defaultValue) => defaultValue,
     });
 
@@ -304,42 +308,6 @@ describe('facet skill integration flow', () => {
     expect(generated).not.toContain('old inline content');
   });
 
-  it('should uninstall selected skill and remove generated file', async () => {
-    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
-    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
-    tempDirs.push(workspaceDir, homeDir);
-    createFacetedFixture(homeDir);
-
-    const facetedRoot = join(homeDir, '.faceted');
-    const skillOutputPath = join(homeDir, '.claude', 'skills', 'coding', 'SKILL.md');
-    mkdirSync(dirname(skillOutputPath), { recursive: true });
-    writeFileSync(skillOutputPath, 'generated content', 'utf-8');
-    writeFileSync(
-      join(facetedRoot, 'skills.yaml'),
-      [
-        'cc:',
-        '  coding:',
-        '    source: coding.yaml',
-        '    mode: inline',
-        `    output: ${skillOutputPath}`,
-      ].join('\n'),
-      'utf-8',
-    );
-
-    const { runFacetCli } = await loadCliModule();
-
-    await runFacetCli(['uninstall', 'skill'], {
-      cwd: workspaceDir,
-      homeDir,
-      select: createSelectStub(['coding (cc: inline)']),
-      input: async (_prompt, defaultValue) => defaultValue,
-    });
-
-    const updatedSkillsConfig = readFileSync(join(facetedRoot, 'skills.yaml'), 'utf-8');
-    expect(updatedSkillsConfig).not.toContain('coding:');
-    expect(existsSync(skillOutputPath)).toBe(false);
-  });
-
   it('should present only supported targets in skill deploy mode', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
@@ -365,8 +333,8 @@ describe('facet skill integration flow', () => {
         return 'Claude Code';
       }
       if (selectCallCount === 4) {
-        expect(candidates).toContain('Inline');
-        return 'Inline';
+        expect(candidates).toContain(INLINE_MODE_LABEL);
+        return INLINE_MODE_LABEL;
       }
       throw new Error(`Unexpected select call: ${candidates.join(', ')}`);
     };
@@ -400,7 +368,7 @@ describe('facet skill integration flow', () => {
     await expect(runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['unsafe', 'Skill deploy', 'Claude Code', 'Inline']),
+      select: createSelectStub(['unsafe', 'Skill deploy', 'Claude Code', INLINE_MODE_LABEL]),
       input: async (_prompt, defaultValue) => defaultValue,
     })).rejects.toThrow('Invalid compose definition name: ../unsafe');
   });
@@ -417,7 +385,7 @@ describe('facet skill integration flow', () => {
     await expect(runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['coding', 'Skill deploy', 'Claude Code', 'Inline']),
+      select: createSelectStub(['coding', 'Skill deploy', 'Claude Code', INLINE_MODE_LABEL]),
       input: async (prompt, defaultValue) =>
         prompt.toLowerCase().includes('output') ? outsidePath : defaultValue,
     })).rejects.toThrow(`Skill output path must be inside home directory: ${outsidePath}`);
@@ -440,7 +408,7 @@ describe('facet skill integration flow', () => {
     await expect(runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['coding', 'Skill deploy', 'Claude Code', 'Inline']),
+      select: createSelectStub(['coding', 'Skill deploy', 'Claude Code', INLINE_MODE_LABEL]),
       input: async (prompt, defaultValue) =>
         prompt.toLowerCase().includes('output') ? symlinkPath : defaultValue,
     })).rejects.toThrow(`Symbolic links are not allowed for skill output file: ${symlinkPath}`);
@@ -463,41 +431,11 @@ describe('facet skill integration flow', () => {
     await expect(runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['coding', 'Skill deploy', 'Claude Code', 'Inline']),
+      select: createSelectStub(['coding', 'Skill deploy', 'Claude Code', INLINE_MODE_LABEL]),
       input: async (_prompt, defaultValue) => defaultValue,
     })).rejects.toThrow(
       `Symbolic links are not allowed for skills registry file: ${registrySymlinkPath}`,
     );
-  });
-
-  it('should reject uninstall when output path in registry is outside home directory', async () => {
-    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
-    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
-    tempDirs.push(workspaceDir, homeDir);
-    createFacetedFixture(homeDir);
-
-    const facetedRoot = join(homeDir, '.faceted');
-    const outsidePath = join(tmpdir(), 'outside-skill.md');
-    writeFileSync(
-      join(facetedRoot, 'skills.yaml'),
-      [
-        'cc:',
-        '  coding:',
-        '    source: coding.yaml',
-        '    mode: inline',
-        `    output: ${outsidePath}`,
-      ].join('\n'),
-      'utf-8',
-    );
-
-    const { runFacetCli } = await loadCliModule();
-
-    await expect(runFacetCli(['uninstall', 'skill'], {
-      cwd: workspaceDir,
-      homeDir,
-      select: createSelectStub(['coding (cc: inline)']),
-      input: async (_prompt, defaultValue) => defaultValue,
-    })).rejects.toThrow(`Skill output path must be inside home directory: ${outsidePath}`);
   });
 
   it('should reject update when output path in registry is outside home directory', async () => {
@@ -565,7 +503,7 @@ describe('facet skill integration flow', () => {
     })).rejects.toThrow(`Symbolic links are not allowed for skill output file: ${symlinkPath}`);
   });
 
-  it('should reject install, update, uninstall, and list without skill subcommand', async () => {
+  it('should reject install, update, and list without skill subcommand', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
@@ -576,7 +514,6 @@ describe('facet skill integration flow', () => {
       { args: ['install'], message: 'Unsupported command: install' },
       { args: ['update'], message: 'Unsupported command: update' },
       { args: ['update', 'foo'], message: 'Unsupported command: update' },
-      { args: ['uninstall'], message: 'Unsupported command: uninstall' },
       { args: ['list'], message: 'Unsupported command: list' },
     ];
 

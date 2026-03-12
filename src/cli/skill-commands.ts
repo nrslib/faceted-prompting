@@ -9,20 +9,25 @@ import {
   resolveDefinitionPathFromSource,
 } from './skill-renderer.js';
 import { buildInstalledSkillLabels, readSkillsRegistry, writeSkillsRegistry } from './skill-registry.js';
-import { removeSkillFile, writeSkillFile } from './skill-file-ops.js';
+import { writeSkillFile } from './skill-file-ops.js';
 import type { SkillEntry, SkillMode, SkillsRegistry } from './skill-types.js';
 import type { FacetCliOptions, FacetCliResult } from './types.js';
 import { runFilePlacementInstall, runSkillDeployInstall, runTemplateApplyInstall } from './install-skill/modes.js';
-import { dispatchInstallFlow, ensureInstallFlowSelection } from './install-skill/flow.js';
+import {
+  dispatchInstallFlow,
+  ensureInstallFlowSelection,
+  SWITCH_TO_INLINE_LABEL,
+  SWITCH_TO_REFERENCE_LABEL,
+} from './install-skill/flow.js';
 
 function resolveTargetModeFromDecision(modeDecision: string): SkillMode | undefined {
   if (modeDecision === 'Keep current') {
     return undefined;
   }
-  if (modeDecision === 'Switch to Reference') {
+  if (modeDecision === SWITCH_TO_REFERENCE_LABEL) {
     return 'reference';
   }
-  if (modeDecision === 'Switch to Inline') {
+  if (modeDecision === SWITCH_TO_INLINE_LABEL) {
     return 'inline';
   }
   throw new Error(`Unsupported skill mode decision: ${modeDecision}`);
@@ -78,14 +83,20 @@ export async function runInstallSkillCommand(options: FacetCliOptions): Promise<
     throw new Error(`No compose definitions found in ${compositionsDir}`);
   }
 
-  const selectedComposition = await options.select(compositionCandidates);
+  const selectedComposition = await options.select(
+    compositionCandidates,
+    'Choose composition with Up/Down and Enter:',
+  );
   const definitionPath = definitionMap[selectedComposition];
   if (!definitionPath) {
     throw new Error(`Unknown compose definition selected: ${selectedComposition}`);
   }
 
   const installSelection = ensureInstallFlowSelection(
-    await options.select(['Skill deploy', 'File placement', 'Template apply']),
+    await options.select(
+      ['Skill deploy', 'File placement', 'Template apply'],
+      'Choose install flow with Up/Down and Enter:',
+    ),
   );
 
   const definition = await loadComposeDefinition(definitionPath);
@@ -150,7 +161,10 @@ export async function runUpdateSkillCommand(options: FacetCliOptions): Promise<F
     throw new Error('No installed skills to update');
   }
 
-  const selection = await options.select(['All', ...installed.map(item => item.label)]);
+  const selection = await options.select(
+    ['All', ...installed.map(item => item.label)],
+    'Choose skills to update with Up/Down and Enter:',
+  );
 
   const selectedEntries =
     selection === 'All' ? installed : installed.filter(item => item.label === selection);
@@ -159,12 +173,15 @@ export async function runUpdateSkillCommand(options: FacetCliOptions): Promise<F
     throw new Error(`Unknown installed skill selected: ${selection}`);
   }
 
-  const modeDecision = await options.select([
-    'Keep current',
-    selectedEntries.some(item => item.entry.mode === 'inline')
-      ? 'Switch to Reference'
-      : 'Switch to Inline',
-  ]);
+  const modeDecision = await options.select(
+    [
+      'Keep current',
+      selectedEntries.some(item => item.entry.mode === 'inline')
+        ? SWITCH_TO_REFERENCE_LABEL
+        : SWITCH_TO_INLINE_LABEL,
+    ],
+    'Choose mode update with Up/Down and Enter:',
+  );
 
   const targetMode = resolveTargetModeFromDecision(modeDecision);
 
@@ -211,49 +228,6 @@ export async function runUpdateSkillCommand(options: FacetCliOptions): Promise<F
   return {
     kind: 'text',
     text: 'Updated skill(s)',
-  };
-}
-
-export async function runUninstallSkillCommand(options: FacetCliOptions): Promise<FacetCliResult> {
-  const { skillsPath } = getSkillPaths(options.homeDir);
-  const registry = readSkillsRegistry(skillsPath);
-  const installed = buildInstalledSkillLabels(registry);
-  if (installed.length === 0) {
-    throw new Error('No installed skills to uninstall');
-  }
-
-  const selection = await options.select(installed.map(item => item.label));
-  const targetSelection = installed.find(item => item.label === selection);
-  if (!targetSelection) {
-    throw new Error(`Unknown installed skill selected: ${selection}`);
-  }
-
-  removeSkillFile(targetSelection.entry.output, options.homeDir);
-
-  const targetEntries = registry[targetSelection.target];
-  if (!targetEntries) {
-    throw new Error(`Invalid skills registry target: ${targetSelection.target}`);
-  }
-
-  const updatedTargetEntries = Object.fromEntries(
-    Object.entries(targetEntries).filter(([skillName]) => skillName !== targetSelection.skillName),
-  );
-  const baseRegistry = Object.fromEntries(
-    Object.entries(registry).filter(([target]) => target !== targetSelection.target),
-  ) as SkillsRegistry;
-
-  const updatedRegistry =
-    Object.keys(updatedTargetEntries).length > 0
-      ? {
-          ...baseRegistry,
-          [targetSelection.target]: updatedTargetEntries,
-        }
-      : baseRegistry;
-
-  writeSkillsRegistry(skillsPath, updatedRegistry, options.homeDir);
-  return {
-    kind: 'path',
-    path: targetSelection.entry.output,
   };
 }
 

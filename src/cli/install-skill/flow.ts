@@ -12,16 +12,21 @@ import type { FacetCliOptions } from '../types.js';
 
 export type InstallFlowSelection = 'Skill deploy' | 'File placement' | 'Template apply';
 
+export const INLINE_MODE_LABEL = 'Inline (embed facet contents into SKILL.md)';
+export const REFERENCE_MODE_LABEL = 'Reference (write facet file paths into SKILL.md)';
+export const SWITCH_TO_REFERENCE_LABEL = 'Switch to Reference (replace embedded contents with file paths)';
+export const SWITCH_TO_INLINE_LABEL = 'Switch to Inline (embed facet contents into SKILL.md)';
+
 export function shouldOverwrite(answer: string): boolean {
   const normalized = answer.trim().toLowerCase();
   return normalized === 'y' || normalized === 'yes';
 }
 
 export function ensureSkillModeFromLabel(modeLabel: string): 'inline' | 'reference' {
-  if (modeLabel === 'Inline') {
+  if (modeLabel === INLINE_MODE_LABEL) {
     return 'inline';
   }
-  if (modeLabel === 'Reference') {
+  if (modeLabel === REFERENCE_MODE_LABEL) {
     return 'reference';
   }
   throw new Error(`Unsupported skill mode: ${modeLabel}`);
@@ -103,7 +108,7 @@ export async function ensureRegenerationTargetDir(params: {
   const { targetDir, options, promptLabel } = params;
 
   if (existsSync(targetDir)) {
-    const overwriteAnswer = await options.input(`${promptLabel} exists. Replace? (${targetDir})`, 'n');
+    const overwriteAnswer = await options.input(`${promptLabel} exists. Replace? (${targetDir}) [y/N]`, 'n');
     if (!shouldOverwrite(overwriteAnswer)) {
       throw new Error(`${promptLabel} exists and overwrite was cancelled: ${targetDir}`);
     }

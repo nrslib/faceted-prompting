@@ -56,6 +56,32 @@ describe('runner', () => {
     expect(exitCode).toBeUndefined();
   });
 
+  it('should print generated paths when runFacetCli returns paths result', async () => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    let exitCode: number | undefined;
+
+    await runMain(['compose'], {
+      runFacetCli: async () => ({
+        kind: 'paths',
+        paths: ['/tmp/coding.system.md', '/tmp/coding.user.md'],
+      }),
+      writeStdout: message => {
+        stdout.push(message);
+      },
+      writeStderr: message => {
+        stderr.push(message);
+      },
+      setExitCode: code => {
+        exitCode = code;
+      },
+    });
+
+    expect(stdout).toEqual(['Generated:\n- /tmp/coding.system.md\n- /tmp/coding.user.md\n']);
+    expect(stderr).toEqual([]);
+    expect(exitCode).toBeUndefined();
+  });
+
   it('should print failure message and set exit code when runFacetCli throws', async () => {
     const stdout: string[] = [];
     const stderr: string[] = [];

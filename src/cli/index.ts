@@ -1,16 +1,15 @@
 import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { compose } from '../compose.js';
-import { loadComposeDefinition } from '../compose-definition.js';
 import { readFacetedConfig } from '../config/index.js';
 import { initializeFacetedHome } from '../init/index.js';
-import { formatComposedOutput, resolveOutputDirectory, writeComposeOutput } from '../output/index.js';
-import { buildFacetSet, ensureSafeDefinitionName, listCompositionDefinitions } from './skill-renderer.js';
+import { formatCombinedOutput, resolveOutputDirectory, writeComposeOutput } from '../output/index.js';
+import { resolveComposeContext } from './compose-context.js';
+import { buildFacetSet, ensureSafeDefinitionName } from './skill-renderer.js';
 import {
   getSkillPaths,
   runInstallSkillCommand,
   runListSkillCommand,
-  runUninstallSkillCommand,
   runUpdateSkillCommand,
 } from './skill-commands.js';
 import type { FacetCliOptions, FacetCliResult } from './types.js';
@@ -23,7 +22,6 @@ const USAGE = [
   '  compose              Compose facets into a prompt file',
   '  install skill        Install a skill from a composition',
   '  update skill         Update installed skill(s)',
-  '  uninstall skill      Uninstall an installed skill',
   '  list skill           List installed skills',
 ].join('\n');
 
@@ -42,21 +40,16 @@ function ensureSkillSubcommand(command: string, subcommand: string | undefined):
 
 async function runComposeCommand(options: FacetCliOptions): Promise<FacetCliResult> {
   const { facetsRoot, compositionsDir } = getSkillPaths(options.homeDir);
-
-  const definitionMap = listCompositionDefinitions(compositionsDir);
-  const candidates = Object.keys(definitionMap).sort();
-  if (candidates.length === 0) {
-    throw new Error(`No compose definitions found in ${compositionsDir}`);
-  }
-
-  const selected = await options.select(candidates);
-  const definitionPath = definitionMap[selected];
-  if (!definitionPath) {
-    throw new Error(`Unknown compose definition selected: ${selected}`);
-  }
-
-  const definition = await loadComposeDefinition(definitionPath);
-  const definitionDir = dirname(definitionPath);
+  const composeContext = resolveComposeContext(options.cwd);
+  const definition = {
+    name: composeContext.name,
+    persona: 'coder',
+    policies: ['coding', 'ai-antipattern'],
+    knowledge: composeContext.knowledgeRefs,
+    instruction: composeContext.relatedInstruction,
+    order: ['policies', 'knowledge', 'instruction'] as const,
+  };
+  const definitionDir = dirname(compositionsDir);
 
   const facetSet = buildFacetSet({
     definitionDir,
@@ -65,41 +58,73 @@ async function runComposeCommand(options: FacetCliOptions): Promise<FacetCliResu
   });
 
   const composed = compose(facetSet, {
-    contextMaxChars: 8000,
+    contextMaxChars: 2000,
     userMessageOrder: definition.order,
   });
 
-  const splitSelection = await options.select(['Combined (single file)', 'Split (system + user)']);
+  const splitSelection = await options.select(
+    ['Combined (single file)', 'Split (system + user)'],
+    'Choose output mode with Up/Down and Enter:',
+  );
   const splitSystem = splitSelection === 'Split (system + user)';
 
   const outputInput = await options.input('Output directory', options.cwd);
   const outputDir = resolveOutputDirectory(outputInput, options.cwd);
-  const outputFileName = `${ensureSafeDefinitionName(definition.name)}.prompt.md`;
-  const outputCandidatePath = resolve(outputDir, outputFileName);
+  const safeName = ensureSafeDefinitionName(definition.name);
+  const outputPlans = splitSystem
+    ? [
+        {
+          fileName: `${safeName}.system.md`,
+          content: `${composed.systemPrompt}\n`,
+        },
+        {
+          fileName: `${safeName}.user.md`,
+          content: `${composed.userMessage}\n`,
+        },
+      ]
+    : [
+        {
+          fileName: `${safeName}.md`,
+          content: formatCombinedOutput(composed),
+        },
+      ];
+  const existingPaths = outputPlans
+    .map(plan => resolve(outputDir, plan.fileName))
+    .filter(path => existsSync(path));
   let overwrite = false;
 
-  if (existsSync(outputCandidatePath)) {
+  if (existingPaths.length > 0) {
     const overwriteAnswer = await options.input(
-      `Output file exists. Overwrite? (${outputCandidatePath})`,
+      `Output file exists. Overwrite? (${existingPaths.join(', ')}) [y/N]`,
       'n',
     );
 
     if (!shouldOverwrite(overwriteAnswer)) {
-      throw new Error(`Output file exists and overwrite was cancelled: ${outputCandidatePath}`);
+      throw new Error(`Output file exists and overwrite was cancelled: ${existingPaths.join(', ')}`);
     }
     overwrite = true;
   }
 
-  const outputPath = await writeComposeOutput({
-    outputDir,
-    fileName: outputFileName,
-    content: formatComposedOutput(composed, splitSystem),
-    overwrite,
-  });
+  const outputPaths: string[] = [];
+  for (const plan of outputPlans) {
+    outputPaths.push(await writeComposeOutput({
+      outputDir,
+      fileName: plan.fileName,
+      content: plan.content,
+      overwrite,
+    }));
+  }
+
+  if (outputPaths.length === 1) {
+    return {
+      kind: 'path',
+      path: outputPaths[0]!,
+    };
+  }
 
   return {
-    kind: 'path',
-    path: outputPath,
+    kind: 'paths',
+    paths: outputPaths,
   };
 }
 
@@ -125,11 +150,6 @@ export async function runFacetCli(
   if (command === 'update') {
     ensureSkillSubcommand(command, subcommand);
     return runUpdateSkillCommand(options);
-  }
-
-  if (command === 'uninstall') {
-    ensureSkillSubcommand(command, subcommand);
-    return runUninstallSkillCommand(options);
   }
 
   if (command === 'list') {

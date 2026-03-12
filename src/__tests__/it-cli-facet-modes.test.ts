@@ -4,6 +4,8 @@ import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
+const REFERENCE_MODE_LABEL = 'Reference (write facet file paths into SKILL.md)';
+
 type CliModule = {
   runFacetCli: (
     args: string[],
@@ -375,7 +377,7 @@ describe('facet install 3-mode integration flow', () => {
     await runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['plain', 'Skill deploy', 'Claude Code', 'Reference']),
+      select: createSelectStub(['plain', 'Skill deploy', 'Claude Code', REFERENCE_MODE_LABEL]),
       input: async (prompt, defaultValue) => {
         if (prompt.toLowerCase().includes('output')) {
           return outputPath;
@@ -404,7 +406,7 @@ describe('facet install 3-mode integration flow', () => {
     await runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['plain', 'Skill deploy', 'Claude Code', 'Reference']),
+      select: createSelectStub(['plain', 'Skill deploy', 'Claude Code', REFERENCE_MODE_LABEL]),
       input: async (prompt, defaultValue) => {
         const normalized = prompt.toLowerCase();
         if (normalized.includes('output')) {
@@ -447,7 +449,7 @@ describe('facet install 3-mode integration flow', () => {
       runFacetCli(['install', 'skill'], {
         cwd: workspaceDir,
         homeDir,
-        select: createSelectStub(['plain', 'Skill deploy', 'Claude Code', 'Reference']),
+        select: createSelectStub(['plain', 'Skill deploy', 'Claude Code', REFERENCE_MODE_LABEL]),
         input: async (prompt, defaultValue) => {
           const normalized = prompt.toLowerCase();
           if (normalized.includes('output')) {
@@ -484,7 +486,7 @@ describe('facet install 3-mode integration flow', () => {
       runFacetCli(['install', 'skill'], {
         cwd: workspaceDir,
         homeDir,
-        select: createSelectStub(['plain', 'Skill deploy', 'Claude Code', 'Reference']),
+        select: createSelectStub(['plain', 'Skill deploy', 'Claude Code', REFERENCE_MODE_LABEL]),
         input: async (prompt, defaultValue) => {
           if (prompt.toLowerCase().includes('output')) {
             return outputPath;
@@ -509,7 +511,7 @@ describe('facet install 3-mode integration flow', () => {
     await runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['templated', 'Skill deploy', 'Claude Code', 'Reference']),
+      select: createSelectStub(['templated', 'Skill deploy', 'Claude Code', REFERENCE_MODE_LABEL]),
       input: async (prompt, defaultValue) => {
         if (prompt.toLowerCase().includes('output')) {
           return targetSkillPath;
@@ -597,7 +599,7 @@ describe('facet install 3-mode integration flow', () => {
     await runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['templated', 'Skill deploy', 'Claude Code', 'Reference']),
+      select: createSelectStub(['templated', 'Skill deploy', 'Claude Code', REFERENCE_MODE_LABEL]),
       input: async (prompt, defaultValue) => {
         if (prompt.toLowerCase().includes('output')) {
           return targetSkillPath;
@@ -626,7 +628,7 @@ describe('facet install 3-mode integration flow', () => {
       runFacetCli(['install', 'skill'], {
         cwd: workspaceDir,
         homeDir,
-        select: createSelectStub(['templated-no-instruction', 'Skill deploy', 'Claude Code', 'Reference']),
+        select: createSelectStub(['templated-no-instruction', 'Skill deploy', 'Claude Code', REFERENCE_MODE_LABEL]),
         input: async (prompt, defaultValue) => {
           if (prompt.toLowerCase().includes('output')) {
             return targetSkillPath;

@@ -12,6 +12,7 @@ type CliModule = {
     input: (prompt: string, defaultValue: string) => Promise<string>;
   }) => Promise<
     | { kind: 'path'; path: string }
+    | { kind: 'paths'; paths: string[] }
     | { kind: 'text'; text: string }
   >;
 };
@@ -30,40 +31,30 @@ describe('facet compose integration flow', () => {
     }
   });
 
-  it('should propagate selected composition and custom output path across init -> resolve -> compose -> output', async () => {
+  it('should auto-select frontend knowledge and include related files in the composed prompt', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
 
     const facetedRoot = join(homeDir, '.faceted');
     const facetsRoot = join(facetedRoot, 'facets');
-    const composeRoot = join(facetedRoot, 'compositions');
 
     mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
     mkdirSync(join(facetsRoot, 'knowledge'), { recursive: true });
     mkdirSync(join(facetsRoot, 'policies'), { recursive: true });
-    mkdirSync(composeRoot, { recursive: true });
 
     writeFileSync(join(facetedRoot, 'config.yaml'), 'version: 1\n', 'utf-8');
     writeFileSync(join(facetsRoot, 'persona', 'coder.md'), 'You are a release engineer.', 'utf-8');
     writeFileSync(join(facetsRoot, 'knowledge', 'architecture.md'), 'System architecture notes.', 'utf-8');
-    writeFileSync(join(facetsRoot, 'policies', 'quality.md'), 'Never hide errors.', 'utf-8');
+    writeFileSync(join(facetsRoot, 'knowledge', 'frontend.md'), 'Frontend implementation notes.', 'utf-8');
+    writeFileSync(join(facetsRoot, 'knowledge', 'backend.md'), 'Backend implementation notes.', 'utf-8');
+    writeFileSync(join(facetsRoot, 'policies', 'coding.md'), 'Never hide errors.', 'utf-8');
+    writeFileSync(join(facetsRoot, 'policies', 'ai-antipattern.md'), 'Do not add dead code.', 'utf-8');
+
+    mkdirSync(join(workspaceDir, 'src'), { recursive: true });
     writeFileSync(
-      join(composeRoot, 'release.yaml'),
-      [
-        'name: release',
-        'persona: coder',
-        'knowledge:',
-        '  - architecture',
-        'policies:',
-        '  - quality',
-        'instruction: Summarize release impact.',
-        'order:',
-        '  - persona',
-        '  - knowledge',
-        '  - policies',
-        '  - instruction',
-      ].join('\n'),
+      join(workspaceDir, 'src', 'App.tsx'),
+      'export function App() { return <main>Hello</main>; }\n',
       'utf-8',
     );
 
@@ -71,41 +62,31 @@ describe('facet compose integration flow', () => {
     mkdirSync(outputDir, { recursive: true });
 
     const { runFacetCli } = await loadCliModule();
-    let selectCallCount = 0;
     const result = await runFacetCli(['compose'], {
       cwd: workspaceDir,
       homeDir,
-      select: async (candidates) => {
-        selectCallCount++;
-        if (selectCallCount === 1) {
-          expect(candidates).toContain('release');
-          return 'release';
-        }
-        return 'Combined (single file)';
-      },
+      select: async () => 'Combined (single file)',
       input: async (_prompt, defaultValue) => {
         expect(defaultValue).toBe(workspaceDir);
         return outputDir;
       },
     });
+
     expect(result.kind).toBe('path');
     if (result.kind !== 'path') {
       throw new Error('Expected path result for compose command');
     }
-    expect(result.path.startsWith(outputDir)).toBe(true);
+    expect(result.path).toBe(join(outputDir, 'frontend.md'));
     expect(existsSync(result.path)).toBe(true);
 
     const generated = readFileSync(result.path, 'utf-8');
-    const systemIndex = generated.indexOf('You are a release engineer.');
-    const knowledgeIndex = generated.indexOf('System architecture notes.');
-    const policyIndex = generated.indexOf('Never hide errors.');
-    const instructionIndex = generated.indexOf('Summarize release impact.');
-
-    expect(systemIndex).toBeGreaterThanOrEqual(0);
-    expect(knowledgeIndex).toBeGreaterThan(systemIndex);
-    expect(policyIndex).toBeGreaterThan(systemIndex);
-    expect(knowledgeIndex).toBeLessThan(policyIndex);
-    expect(instructionIndex).toBeGreaterThan(policyIndex);
+    expect(generated).toContain('You are a release engineer.');
+    expect(generated).toContain('System architecture notes.');
+    expect(generated).toContain('Frontend implementation notes.');
+    expect(generated).toContain('Never hide errors.');
+    expect(generated).toContain('# Related Files');
+    expect(generated).toContain('src/App.tsx');
+    expect(generated).toContain('Source: src/App.tsx');
   });
 
   it('should reject unsupported commands', async () => {
@@ -155,24 +136,18 @@ describe('facet compose integration flow', () => {
     })).rejects.toThrow(`Invalid faceted config file: ${configPath}`);
   });
 
-  it('should initialize faceted home on first run and write output to cwd when input is blank', async () => {
+  it('should initialize faceted home on first run and write split output to cwd when input is blank', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
 
+    writeFileSync(join(workspaceDir, 'server.ts'), 'export const server = true;\n', 'utf-8');
+
     const { runFacetCli } = await loadCliModule();
-    let selectCallCount = 0;
     const result = await runFacetCli(['compose'], {
       cwd: workspaceDir,
       homeDir,
-      select: async (candidates) => {
-        selectCallCount++;
-        if (selectCallCount === 1) {
-          expect(candidates).toContain('coding');
-          return 'coding';
-        }
-        return 'Split (system + user)';
-      },
+      select: async () => 'Split (system + user)',
       input: async (_prompt, defaultValue) => {
         expect(defaultValue).toBe(workspaceDir);
         return '   ';
@@ -180,170 +155,45 @@ describe('facet compose integration flow', () => {
     });
 
     expect(existsSync(join(homeDir, '.faceted', 'config.yaml'))).toBe(true);
+    expect(result.kind).toBe('paths');
+    if (result.kind !== 'paths') {
+      throw new Error('Expected paths result for compose command');
+    }
+    expect(result.paths).toEqual([
+      join(workspaceDir, 'coding.system.md'),
+      join(workspaceDir, 'coding.user.md'),
+    ]);
+
+    const generatedSystem = readFileSync(result.paths[0]!, 'utf-8');
+    const generatedUser = readFileSync(result.paths[1]!, 'utf-8');
+    expect(generatedSystem).toContain('You are a helpful coding assistant.');
+    expect(generatedUser).toContain('# Related Files');
+    expect(generatedUser).toContain('server.ts');
+  });
+
+  it('should truncate related file content and keep source reference', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeFileSync(join(workspaceDir, 'long.ts'), `${'x'.repeat(2500)}\n`, 'utf-8');
+
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli(['compose'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: async () => 'Combined (single file)',
+      input: async (_prompt, defaultValue) => defaultValue,
+    });
+
     expect(result.kind).toBe('path');
     if (result.kind !== 'path') {
       throw new Error('Expected path result for compose command');
     }
-    expect(result.path).toBe(join(workspaceDir, 'coding.prompt.md'));
 
     const generated = readFileSync(result.path, 'utf-8');
-    expect(generated).toContain('# System Prompt');
-    expect(generated).toContain('You are a helpful coding assistant.');
-  });
-
-  it('should reject when no compose definitions are available', async () => {
-    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
-    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
-    tempDirs.push(workspaceDir, homeDir);
-
-    const facetedRoot = join(homeDir, '.faceted');
-    const compositionsDir = join(facetedRoot, 'compositions');
-    mkdirSync(compositionsDir, { recursive: true });
-    mkdirSync(join(compositionsDir, 'coding.yaml'), { recursive: true });
-    mkdirSync(join(compositionsDir, 'frontend.yaml'), { recursive: true });
-    mkdirSync(join(compositionsDir, 'backend.yaml'), { recursive: true });
-    writeFileSync(join(facetedRoot, 'config.yaml'), 'version: 1\n', 'utf-8');
-
-    const { runFacetCli } = await loadCliModule();
-    await expect(runFacetCli(['compose'], {
-      cwd: workspaceDir,
-      homeDir,
-      select: async () => 'unused',
-      input: async (_prompt, defaultValue) => defaultValue,
-    })).rejects.toThrow('No compose definitions found');
-  });
-
-  it('should reject unknown compose definition selections', async () => {
-    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
-    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
-    tempDirs.push(workspaceDir, homeDir);
-
-    const facetedRoot = join(homeDir, '.faceted');
-    const facetsRoot = join(facetedRoot, 'facets');
-    const composeRoot = join(facetedRoot, 'compositions');
-    mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
-    mkdirSync(composeRoot, { recursive: true });
-
-    writeFileSync(join(facetedRoot, 'config.yaml'), 'version: 1\n', 'utf-8');
-    writeFileSync(join(facetsRoot, 'persona', 'coder.md'), 'You are a release engineer.', 'utf-8');
-    writeFileSync(
-      join(composeRoot, 'release.yaml'),
-      [
-        'name: release',
-        'persona: coder',
-      ].join('\n'),
-      'utf-8',
-    );
-
-    const { runFacetCli } = await loadCliModule();
-    await expect(runFacetCli(['compose'], {
-      cwd: workspaceDir,
-      homeDir,
-      select: async () => 'not-a-candidate',
-      input: async (_prompt, defaultValue) => defaultValue,
-    })).rejects.toThrow('Unknown compose definition selected: not-a-candidate');
-  });
-
-  it('should reject writing outside output directory when compose name is unsafe', async () => {
-    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
-    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
-    tempDirs.push(workspaceDir, homeDir);
-
-    const facetedRoot = join(homeDir, '.faceted');
-    const facetsRoot = join(facetedRoot, 'facets');
-    const composeRoot = join(facetedRoot, 'compositions');
-
-    mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
-    mkdirSync(composeRoot, { recursive: true });
-
-    writeFileSync(join(facetedRoot, 'config.yaml'), 'version: 1\n', 'utf-8');
-    writeFileSync(join(facetsRoot, 'persona', 'coder.md'), 'You are a release engineer.', 'utf-8');
-    writeFileSync(
-      join(composeRoot, 'release.yaml'),
-      [
-        'name: ../escape',
-        'persona: coder',
-      ].join('\n'),
-      'utf-8',
-    );
-
-    const { runFacetCli } = await loadCliModule();
-    await expect(runFacetCli(['compose'], {
-      cwd: workspaceDir,
-      homeDir,
-      select: async () => 'release',
-      input: async (_prompt, defaultValue) => defaultValue,
-    })).rejects.toThrow('Invalid compose definition name');
-  });
-
-  it('should reject facet reference paths outside faceted root', async () => {
-    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
-    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
-    tempDirs.push(workspaceDir, homeDir);
-
-    const facetedRoot = join(homeDir, '.faceted');
-    const facetsRoot = join(facetedRoot, 'facets');
-    const composeRoot = join(facetedRoot, 'compositions');
-    const outsideDir = mkdtempSync(join(tmpdir(), 'facet-outside-'));
-    tempDirs.push(outsideDir);
-
-    mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
-    mkdirSync(composeRoot, { recursive: true });
-
-    writeFileSync(join(facetedRoot, 'config.yaml'), 'version: 1\n', 'utf-8');
-    writeFileSync(join(outsideDir, 'secret.md'), 'sensitive', 'utf-8');
-    writeFileSync(
-      join(composeRoot, 'release.yaml'),
-      [
-        'name: release',
-        `persona: ${join(outsideDir, 'secret.md')}`,
-      ].join('\n'),
-      'utf-8',
-    );
-
-    const { runFacetCli } = await loadCliModule();
-    await expect(runFacetCli(['compose'], {
-      cwd: workspaceDir,
-      homeDir,
-      select: async () => 'release',
-      input: async (_prompt, defaultValue) => defaultValue,
-    })).rejects.toThrow('allowed facets directory');
-  });
-
-  it('should reject symlinked facet files even when located under allowed root', async () => {
-    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
-    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
-    const outsideDir = mkdtempSync(join(tmpdir(), 'facet-outside-'));
-    tempDirs.push(workspaceDir, homeDir, outsideDir);
-
-    const facetedRoot = join(homeDir, '.faceted');
-    const facetsRoot = join(facetedRoot, 'facets');
-    const composeRoot = join(facetedRoot, 'compositions');
-    const personaRoot = join(facetsRoot, 'persona');
-
-    mkdirSync(personaRoot, { recursive: true });
-    mkdirSync(composeRoot, { recursive: true });
-
-    writeFileSync(join(facetedRoot, 'config.yaml'), 'version: 1\n', 'utf-8');
-    const outsidePersonaPath = join(outsideDir, 'outside-persona.md');
-    writeFileSync(outsidePersonaPath, 'Outside persona', 'utf-8');
-    symlinkSync(outsidePersonaPath, join(personaRoot, 'linked.md'));
-    writeFileSync(
-      join(composeRoot, 'release.yaml'),
-      [
-        'name: release',
-        'persona: linked',
-      ].join('\n'),
-      'utf-8',
-    );
-
-    const { runFacetCli } = await loadCliModule();
-    await expect(runFacetCli(['compose'], {
-      cwd: workspaceDir,
-      homeDir,
-      select: async () => 'release',
-      input: async (_prompt, defaultValue) => defaultValue,
-    })).rejects.toThrow('Symbolic links are not allowed');
+    expect(generated).toContain('...TRUNCATED...');
+    expect(generated).toContain('Source: long.ts');
   });
 
   it('should cancel overwrite when output file exists and answer is not y/yes', async () => {
@@ -351,37 +201,23 @@ describe('facet compose integration flow', () => {
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
 
-    const facetedRoot = join(homeDir, '.faceted');
-    const facetsRoot = join(facetedRoot, 'facets');
-    const composeRoot = join(facetedRoot, 'compositions');
-    mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
-    mkdirSync(composeRoot, { recursive: true });
-
-    writeFileSync(join(facetedRoot, 'config.yaml'), 'version: 1\n', 'utf-8');
-    writeFileSync(join(facetsRoot, 'persona', 'coder.md'), 'You are a release engineer.', 'utf-8');
-    writeFileSync(
-      join(composeRoot, 'release.yaml'),
-      [
-        'name: release',
-        'persona: coder',
-      ].join('\n'),
-      'utf-8',
-    );
+    writeFileSync(join(workspaceDir, 'server.ts'), 'export const server = true;\n', 'utf-8');
 
     const outputDir = join(workspaceDir, 'out');
     mkdirSync(outputDir, { recursive: true });
-    const outputPath = join(outputDir, 'release.prompt.md');
+    const outputPath = join(outputDir, 'coding.md');
     writeFileSync(outputPath, 'existing content', 'utf-8');
 
     const { runFacetCli } = await loadCliModule();
     await expect(runFacetCli(['compose'], {
       cwd: workspaceDir,
       homeDir,
-      select: async () => 'release',
+      select: async () => 'Combined (single file)',
       input: async (prompt) => {
         if (prompt.startsWith('Output directory')) {
           return outputDir;
         }
+        expect(prompt).toContain('[y/N]');
         return 'n';
       },
     })).rejects.toThrow(`Output file exists and overwrite was cancelled: ${outputPath}`);
@@ -394,37 +230,23 @@ describe('facet compose integration flow', () => {
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
 
-    const facetedRoot = join(homeDir, '.faceted');
-    const facetsRoot = join(facetedRoot, 'facets');
-    const composeRoot = join(facetedRoot, 'compositions');
-    mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
-    mkdirSync(composeRoot, { recursive: true });
-
-    writeFileSync(join(facetedRoot, 'config.yaml'), 'version: 1\n', 'utf-8');
-    writeFileSync(join(facetsRoot, 'persona', 'coder.md'), 'You are a release engineer.', 'utf-8');
-    writeFileSync(
-      join(composeRoot, 'release.yaml'),
-      [
-        'name: release',
-        'persona: coder',
-      ].join('\n'),
-      'utf-8',
-    );
+    writeFileSync(join(workspaceDir, 'server.ts'), 'export const server = true;\n', 'utf-8');
 
     const outputDir = join(workspaceDir, 'out');
     mkdirSync(outputDir, { recursive: true });
-    const outputPath = join(outputDir, 'release.prompt.md');
+    const outputPath = join(outputDir, 'coding.md');
     writeFileSync(outputPath, 'existing content', 'utf-8');
 
     const { runFacetCli } = await loadCliModule();
     const result = await runFacetCli(['compose'], {
       cwd: workspaceDir,
       homeDir,
-      select: async () => 'release',
+      select: async () => 'Combined (single file)',
       input: async (prompt) => {
         if (prompt.startsWith('Output directory')) {
           return outputDir;
         }
+        expect(prompt).toContain('[y/N]');
         return 'yes';
       },
     });
@@ -434,7 +256,7 @@ describe('facet compose integration flow', () => {
       throw new Error('Expected path result for compose command');
     }
     expect(result.path).toBe(outputPath);
-    expect(readFileSync(outputPath, 'utf-8')).toContain('You are a release engineer.');
+    expect(readFileSync(outputPath, 'utf-8')).toContain('server.ts');
   });
 
   it('should reject writing to a symlinked output file', async () => {
@@ -442,69 +264,26 @@ describe('facet compose integration flow', () => {
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
 
-    const facetedRoot = join(homeDir, '.faceted');
-    const facetsRoot = join(facetedRoot, 'facets');
-    const composeRoot = join(facetedRoot, 'compositions');
-
-    mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
-    mkdirSync(composeRoot, { recursive: true });
-
-    writeFileSync(join(facetedRoot, 'config.yaml'), 'version: 1\n', 'utf-8');
-    writeFileSync(join(facetsRoot, 'persona', 'coder.md'), 'You are a release engineer.', 'utf-8');
-    writeFileSync(
-      join(composeRoot, 'release.yaml'),
-      [
-        'name: release',
-        'persona: coder',
-      ].join('\n'),
-      'utf-8',
-    );
+    writeFileSync(join(workspaceDir, 'server.ts'), 'export const server = true;\n', 'utf-8');
 
     const outputDir = join(workspaceDir, 'out');
     mkdirSync(outputDir, { recursive: true });
     const outsideTargetPath = join(workspaceDir, 'outside-target.md');
     writeFileSync(outsideTargetPath, 'outside', 'utf-8');
-    symlinkSync(outsideTargetPath, join(outputDir, 'release.prompt.md'));
+    symlinkSync(outsideTargetPath, join(outputDir, 'coding.md'));
 
     const { runFacetCli } = await loadCliModule();
     await expect(runFacetCli(['compose'], {
       cwd: workspaceDir,
       homeDir,
-      select: async () => 'release',
+      select: async () => 'Combined (single file)',
       input: async (prompt) => {
         if (prompt.startsWith('Output directory')) {
           return outputDir;
         }
+        expect(prompt).toContain('[y/N]');
         return 'y';
       },
     })).rejects.toThrow('Symbolic links are not allowed for output file');
-  });
-
-  it('should reject symlinked compose definition files', async () => {
-    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
-    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
-    const outsideDir = mkdtempSync(join(tmpdir(), 'facet-outside-'));
-    tempDirs.push(workspaceDir, homeDir, outsideDir);
-
-    const facetedRoot = join(homeDir, '.faceted');
-    const facetsRoot = join(facetedRoot, 'facets');
-    const composeRoot = join(facetedRoot, 'compositions');
-
-    mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
-    mkdirSync(composeRoot, { recursive: true });
-
-    writeFileSync(join(facetedRoot, 'config.yaml'), 'version: 1\n', 'utf-8');
-    writeFileSync(join(facetsRoot, 'persona', 'coder.md'), 'You are a release engineer.', 'utf-8');
-    const outsideComposePath = join(outsideDir, 'outside-release.yaml');
-    writeFileSync(outsideComposePath, ['name: release', 'persona: coder'].join('\n'), 'utf-8');
-    symlinkSync(outsideComposePath, join(composeRoot, 'release.yaml'));
-
-    const { runFacetCli } = await loadCliModule();
-    await expect(runFacetCli(['compose'], {
-      cwd: workspaceDir,
-      homeDir,
-      select: async () => 'release',
-      input: async (_prompt, defaultValue) => defaultValue,
-    })).rejects.toThrow('Symbolic links are not allowed');
   });
 });

@@ -8,6 +8,7 @@ type SelectModule = {
     candidates: string[],
     inStream: NodeJS.ReadStream & { setRawMode: (mode: boolean) => void },
     outStream: NodeJS.WriteStream,
+    prompt?: string,
   ) => Promise<string>;
 };
 
@@ -62,5 +63,26 @@ describe('selectInteractiveFromIO', () => {
       input as unknown as NodeJS.ReadStream & { setRawMode: (mode: boolean) => void },
       output as unknown as NodeJS.WriteStream,
     )).rejects.toThrow('requires a TTY');
+  });
+
+  it('should render custom prompt when provided', async () => {
+    const { selectInteractiveFromIO } = await loadSelectModule();
+    const input = new FakeInput();
+    const output = new FakeOutput();
+
+    const promise = selectInteractiveFromIO(
+      [
+        'Inline (embed facet contents into SKILL.md)',
+        'Reference (write facet file paths into SKILL.md)',
+      ],
+      input as unknown as NodeJS.ReadStream & { setRawMode: (mode: boolean) => void },
+      output as unknown as NodeJS.WriteStream,
+      'Choose skill mode with Up/Down and Enter:',
+    );
+
+    input.emit('keypress', '', { name: 'return' });
+
+    await expect(promise).resolves.toBe('Inline (embed facet contents into SKILL.md)');
+    expect(output.writes.join('')).toContain('Choose skill mode with Up/Down and Enter:');
   });
 });

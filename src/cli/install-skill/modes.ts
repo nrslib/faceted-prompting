@@ -11,6 +11,8 @@ import {
   ensureDirectoryExists,
   ensureRegenerationTargetDir,
   ensureSkillModeFromLabel,
+  INLINE_MODE_LABEL,
+  REFERENCE_MODE_LABEL,
   ensureTemplateDirectory,
   resolveInstallTarget,
 } from './flow.js';
@@ -87,9 +89,17 @@ export async function runSkillDeployInstall(params: {
   definition: ComposeDefinition;
   sections: SkillSections;
 }): Promise<{ result: FacetCliResult; mode: 'inline' | 'reference'; outputPath: string; target: 'cc' }> {
-  const targetLabel = await params.options.select(['Claude Code']);
+  const targetLabel = await params.options.select(
+    ['Claude Code'],
+    'Choose install target with Up/Down and Enter:',
+  );
   const target = resolveInstallTarget(targetLabel);
-  const mode = ensureSkillModeFromLabel(await params.options.select(['Inline', 'Reference']));
+  const mode = ensureSkillModeFromLabel(
+    await params.options.select(
+      [INLINE_MODE_LABEL, REFERENCE_MODE_LABEL],
+      'Choose skill mode with Up/Down and Enter:',
+    ),
+  );
   const defaultPath = defaultOutputPath(params.options.homeDir, params.safeSkillName);
   const outputPath = resolve(await params.options.input('Output path', defaultPath));
   const { resolvedPath: boundedOutputPath } = ensurePathWithinHome(

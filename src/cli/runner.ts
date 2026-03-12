@@ -8,7 +8,10 @@ import { selectInteractive } from './select.js';
 async function inputInteractive(prompt: string, defaultValue: string): Promise<string> {
   const rl = createInterface({ input, output });
   try {
-    const answer = (await rl.question(`${prompt} [${defaultValue}]: `)).trim();
+    const renderedPrompt = prompt.includes('[y/N]') || prompt.includes('[Y/n]')
+      ? `${prompt}: `
+      : `${prompt} [${defaultValue}]: `;
+    const answer = (await rl.question(renderedPrompt)).trim();
     return answer.length > 0 ? answer : defaultValue;
   } finally {
     rl.close();
@@ -55,6 +58,11 @@ export async function runMain(
 
     if (result.kind === 'path') {
       dependencies.writeStdout(`Generated: ${result.path}\n`);
+      return;
+    }
+
+    if (result.kind === 'paths') {
+      dependencies.writeStdout(`Generated:\n${result.paths.map(path => `- ${path}`).join('\n')}\n`);
       return;
     }
 

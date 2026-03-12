@@ -5,8 +5,8 @@ type SelectInput = NodeJS.ReadStream & {
   setRawMode: (mode: boolean) => void;
 };
 
-function renderMenu(candidates: string[], selectedIndex: number): string[] {
-  const lines: string[] = ['Choose composition with Up/Down and Enter:'];
+function renderMenu(candidates: string[], selectedIndex: number, prompt: string): string[] {
+  const lines: string[] = [prompt];
   for (let index = 0; index < candidates.length; index += 1) {
     const marker = index === selectedIndex ? '\x1B[36m❯\x1B[0m' : ' ';
     lines.push(`${marker} ${candidates[index]}`);
@@ -28,6 +28,7 @@ export async function selectInteractiveFromIO(
   candidates: string[],
   inStream: SelectInput,
   outStream: NodeJS.WriteStream,
+  prompt = 'Choose option with Up/Down and Enter:',
 ): Promise<string> {
   if (!inStream.isTTY) {
     throw new Error('Interactive selection requires a TTY');
@@ -40,7 +41,7 @@ export async function selectInteractiveFromIO(
   let selectedIndex = 0;
   let prevLineCount = 0;
 
-  const lines = renderMenu(candidates, selectedIndex);
+  const lines = renderMenu(candidates, selectedIndex, prompt);
   outStream.write('\n');
   drawMenu(outStream, lines);
   prevLineCount = lines.length;
@@ -55,7 +56,7 @@ export async function selectInteractiveFromIO(
 
       if (key.name === 'up') {
         selectedIndex = selectedIndex === 0 ? candidates.length - 1 : selectedIndex - 1;
-        const newLines = renderMenu(candidates, selectedIndex);
+        const newLines = renderMenu(candidates, selectedIndex, prompt);
         redrawMenu(outStream, newLines, prevLineCount);
         prevLineCount = newLines.length;
         return;
@@ -63,7 +64,7 @@ export async function selectInteractiveFromIO(
 
       if (key.name === 'down') {
         selectedIndex = selectedIndex === candidates.length - 1 ? 0 : selectedIndex + 1;
-        const newLines = renderMenu(candidates, selectedIndex);
+        const newLines = renderMenu(candidates, selectedIndex, prompt);
         redrawMenu(outStream, newLines, prevLineCount);
         prevLineCount = newLines.length;
         return;
@@ -86,6 +87,6 @@ export async function selectInteractiveFromIO(
   });
 }
 
-export async function selectInteractive(candidates: string[]): Promise<string> {
-  return selectInteractiveFromIO(candidates, input as SelectInput, output);
+export async function selectInteractive(candidates: string[], prompt?: string): Promise<string> {
+  return selectInteractiveFromIO(candidates, input as SelectInput, output, prompt);
 }

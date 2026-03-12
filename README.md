@@ -37,10 +37,12 @@ First run initializes `~/.faceted`:
 ## `facet compose` Usage
 
 1. Run `facet compose`.
-2. Select a composition with `↑` / `↓` and press `Enter`.
+2. `facet compose` detects related files from the current working tree and automatically selects `coding` / `frontend` / `backend`.
 3. Confirm output directory (default: current working directory) or type another path.
-4. If `{name}.prompt.md` already exists, confirm overwrite (`y`/`yes` to overwrite).
-5. Generated prompt file is written as `{name}.prompt.md`.
+4. Choose output mode:
+   - `Combined (single file)` writes `{name}.md`
+   - `Split (system + user)` writes `{name}.system.md` and `{name}.user.md`
+5. If the target file already exists, confirm overwrite (`y`/`yes` to overwrite).
 
 When `~/.faceted` is already initialized, `facet compose` reuses existing config/templates and does not overwrite files.
 
@@ -67,6 +69,8 @@ order:
 - `description` is optional.
 - `order` applies only to user-message sections (`knowledge`, `policies`, `instruction`).
 - `persona` is always used for `systemPrompt` and is not order-controlled.
+
+`facet compose` itself no longer asks you to choose one of these definitions interactively. The CLI always includes `coder` + `coding` + `ai-antipattern` + `architecture`, then adds `frontend` / `backend` knowledge when related files indicate those areas.
 
 ## Quick Start
 
