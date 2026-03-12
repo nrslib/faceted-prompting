@@ -12,6 +12,8 @@ All notable changes to this project will be documented in this file.
 ### Internal
 - `typescript-eslint` を追加し ESLint flat config (`eslint.config.js`) を導入
 - 未使用変数・import の除去（`facetPaths`, `copiedFacetPaths`, `afterEach`）
+- CI を `verify:release` スクリプトに統一し、`pack:check` / `smoke:pack` による publish 前検証を追加
+- `prepublishOnly` を `verify:release` に変更、`prepack` で build を実行するよう整理
 
 ## [0.2.0] - 2026-03-12
 
