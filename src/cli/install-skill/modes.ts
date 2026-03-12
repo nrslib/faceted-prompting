@@ -7,7 +7,6 @@ import type { FacetCliOptions, FacetCliResult } from '../types.js';
 import {
   applyFacetTokensToPath,
   buildInlineFacetTokenValues,
-  buildSectionsWithCopiedPaths,
   copyFacetFiles,
   parseScanDepth,
 } from './facets.js';
@@ -23,6 +22,7 @@ import {
 import type { SkillSections } from './facets.js';
 import type { ComposeDefinition } from '../../types.js';
 import type { InstallTarget } from '../skill-types.js';
+import { composePromptPayload } from '../../prompt-payload.js';
 
 function ensureTemplateBackedSkillFrontmatter(params: {
   outputPath: string;
@@ -47,12 +47,20 @@ export async function runTemplateApplyInstall(params: {
   safeSkillName: string;
   sections: SkillSections;
   templateDir: string;
+  definitionDir: string;
+  facetsRoot: string;
 }): Promise<FacetCliResult> {
   const requestedDir = await params.options.input('Output directory', params.options.cwd);
   const targetDir = resolve(requestedDir);
   ensureDirectoryExists(targetDir, 'Output directory');
 
   const scanDepth = parseScanDepth(await params.options.input('Scan depth', '1'));
+  const payload = composePromptPayload({
+    definition: params.sections.definition,
+    definitionDir: params.definitionDir,
+    facetsRoot: params.facetsRoot,
+    composeOptions: { contextMaxChars: 8000 },
+  });
 
   copyDirectoryTree(params.templateDir, targetDir);
 
@@ -66,7 +74,11 @@ export async function runTemplateApplyInstall(params: {
   const facetPaths = copyFacetFiles({
     targetDir,
     safeSkillName: params.safeSkillName,
-    sections: params.sections,
+    copyFiles: payload.copyFiles,
+    literalInstructionBody:
+      params.sections.instruction && !('path' in params.sections.instruction)
+        ? params.sections.instruction.body
+        : undefined,
   });
 
   applyFacetTokensToPath({
@@ -85,6 +97,8 @@ export async function runTemplateApplyInstall(params: {
 export async function runSkillDeployInstall(params: {
   options: FacetCliOptions;
   facetedRoot: string;
+  definitionDir: string;
+  facetsRoot: string;
   safeSkillName: string;
   definition: ComposeDefinition;
   sections: SkillSections;
@@ -110,6 +124,12 @@ export async function runSkillDeployInstall(params: {
   const templateDir = params.definition.template
     ? ensureTemplateDirectory(params.facetedRoot, params.definition.template)
     : undefined;
+  const payload = composePromptPayload({
+    definition: params.definition,
+    definitionDir: params.definitionDir,
+    facetsRoot: params.facetsRoot,
+    composeOptions: { contextMaxChars: 8000 },
+  });
   const targetDir = dirname(boundedOutputPath);
 
   await ensureRegenerationTargetDir({
@@ -125,7 +145,11 @@ export async function runSkillDeployInstall(params: {
     const facetPaths = copyFacetFiles({
       targetDir,
       safeSkillName: params.safeSkillName,
-      sections: params.sections,
+      copyFiles: payload.copyFiles,
+      literalInstructionBody:
+        params.sections.instruction && !('path' in params.sections.instruction)
+          ? params.sections.instruction.body
+          : undefined,
     });
 
     applyFacetTokensToPath({
@@ -144,7 +168,11 @@ export async function runSkillDeployInstall(params: {
     const copiedFacetPaths = copyFacetFiles({
       targetDir,
       safeSkillName: params.safeSkillName,
-      sections: params.sections,
+      copyFiles: payload.copyFiles,
+      literalInstructionBody:
+        params.sections.instruction && !('path' in params.sections.instruction)
+          ? params.sections.instruction.body
+          : undefined,
     });
 
     const content = renderSkillDocument({

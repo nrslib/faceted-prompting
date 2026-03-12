@@ -11,11 +11,14 @@ export type {
   FacetContent,
   FacetSet,
   ComposedPrompt,
+  ComposedPromptPayload,
   ComposeOptions,
+  CopyFiles,
 } from './types.js';
 
 // Compose
 export { compose } from './compose.js';
+export { composePromptPayload } from './prompt-payload.js';
 
 // DataEngine
 export type { DataEngine } from './data-engine.js';

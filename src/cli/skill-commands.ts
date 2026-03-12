@@ -52,6 +52,8 @@ export async function runInstallSkillCommand(options: FacetCliOptions): Promise<
   return (await runSkillDeployInstall({
     options,
     facetedRoot,
+    definitionDir,
+    facetsRoot,
     safeSkillName,
     definition,
     sections,
