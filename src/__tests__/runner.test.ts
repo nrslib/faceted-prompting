@@ -28,34 +28,6 @@ describe('runner', () => {
     expect(exitCode).toBeUndefined();
   });
 
-  it('should print text output when runFacetCli returns text result', async () => {
-    const stdout: string[] = [];
-    const stderr: string[] = [];
-    let exitCode: number | undefined;
-
-    await runMain(['list', 'skill'], {
-      runFacetCli: async () => ({
-        kind: 'text',
-        text: 'cc\n- coding (mode: inline, source: coding.yaml, output: ~/.claude/skills/coding/SKILL.md)',
-      }),
-      writeStdout: message => {
-        stdout.push(message);
-      },
-      writeStderr: message => {
-        stderr.push(message);
-      },
-      setExitCode: code => {
-        exitCode = code;
-      },
-    });
-
-    expect(stdout).toEqual([
-      'cc\n- coding (mode: inline, source: coding.yaml, output: ~/.claude/skills/coding/SKILL.md)\n',
-    ]);
-    expect(stderr).toEqual([]);
-    expect(exitCode).toBeUndefined();
-  });
-
   it('should print generated paths when runFacetCli returns paths result', async () => {
     const stdout: string[] = [];
     const stderr: string[] = [];

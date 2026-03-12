@@ -49,6 +49,29 @@ describe('initializeFacetedHome', () => {
     expect(existsSync(join(facetsRoot, 'knowledge', 'architecture.md'))).toBe(true);
     expect(existsSync(join(facetsRoot, 'policies', 'coding.md'))).toBe(true);
     expect(existsSync(join(facetedRoot, 'compositions', 'coding.yaml'))).toBe(true);
+    expect(existsSync(join(facetedRoot, 'compositions', 'issue-worktree.yaml'))).toBe(true);
+    expect(existsSync(join(facetedRoot, 'templates', 'issue-worktree', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(facetedRoot, 'templates', 'issue-worktree', 'README.md'))).toBe(true);
+    expect(
+      existsSync(join(facetedRoot, 'templates', 'issue-worktree', 'templates', 'instructions', 'fix.md')),
+    ).toBe(true);
+  });
+
+  it('should install the default issue-worktree sample template content', async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), 'faceted-home-'));
+    tempDirs.push(homeDir);
+
+    const { initializeFacetedHome } = await loadInitModule();
+    await initializeFacetedHome({ homeDir });
+
+    const facetedRoot = join(homeDir, '.faceted');
+    const compositionBody = readFileSync(join(facetedRoot, 'compositions', 'issue-worktree.yaml'), 'utf-8');
+    const skillTemplateBody = readFileSync(join(facetedRoot, 'templates', 'issue-worktree', 'SKILL.md'), 'utf-8');
+
+    expect(compositionBody).toContain('template: issue-worktree');
+    expect(skillTemplateBody).toContain('{{facet:persona}}');
+    expect(skillTemplateBody).toContain('{{facet:policies}}');
+    expect(skillTemplateBody).toContain('{{facet:knowledges}}');
   });
 
   it('should initialize config with extensible skillPaths field', async () => {

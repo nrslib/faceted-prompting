@@ -6,6 +6,7 @@ const FACET_TOKEN_PATTERN = /{{facet:(persona|knowledges|policies|instructions)}
 const FACET_TOKEN_TEST = /{{facet:(persona|knowledges|policies|instructions)}}/;
 
 type FacetPlaceholderKey = 'persona' | 'knowledges' | 'policies' | 'instructions';
+type FacetTokenValues = Record<FacetPlaceholderKey, string>;
 
 export type SkillSections = ReturnType<typeof buildSkillSections>;
 
@@ -44,25 +45,18 @@ function normalizeInstructionBody(body: string): string {
   return body.endsWith('\n') ? body : `${body}\n`;
 }
 
-function renderFacetTokenValue(key: FacetPlaceholderKey, facets: FacetPathMap): string {
-  if (key === 'persona') {
-    return facets.persona;
-  }
-  if (key === 'knowledges') {
-    return facets.knowledges.join('\n');
-  }
-  if (key === 'policies') {
-    return facets.policies.join('\n');
-  }
-  if (!facets.instructions) {
-    throw new Error('Missing instructions facet path for {{facet:instructions}} placeholder');
-  }
-  return facets.instructions;
+export function buildInlineFacetTokenValues(sections: SkillSections): FacetTokenValues {
+  return {
+    persona: sections.persona.body,
+    knowledges: sections.knowledge.map(knowledge => knowledge.body).join('\n'),
+    policies: sections.policies.map(policy => policy.body).join('\n'),
+    instructions: sections.instruction ? sections.instruction.body : '',
+  };
 }
 
-function replaceFacetTokens(content: string, facets: FacetPathMap): string {
+function replaceFacetTokens(content: string, values: FacetTokenValues): string {
   return content.replaceAll(FACET_TOKEN_PATTERN, (_match, token: FacetPlaceholderKey) => {
-    return renderFacetTokenValue(token, facets);
+    return values[token];
   });
 }
 
@@ -169,10 +163,10 @@ export function copyFacetFiles(params: {
 export function applyFacetTokensToPath(params: {
   rootDir: string;
   maxDepth: number;
-  facets: FacetPathMap;
+  tokenValues: FacetTokenValues;
   excludeDirs: readonly string[];
 }): void {
-  const { rootDir, maxDepth, facets, excludeDirs } = params;
+  const { rootDir, maxDepth, tokenValues, excludeDirs } = params;
 
   const visit = (currentDir: string, depth: number): void => {
     for (const entry of readdirSync(currentDir, { withFileTypes: true })) {
@@ -200,7 +194,7 @@ export function applyFacetTokensToPath(params: {
         continue;
       }
 
-      const replaced = replaceFacetTokens(original, facets);
+      const replaced = replaceFacetTokens(original, tokenValues);
       if (replaced !== original) {
         writeFileSync(entryPath, replaced, 'utf-8');
       }

@@ -33,6 +33,7 @@ First run initializes `~/.faceted`:
 - `~/.faceted/facets/knowledge`
 - `~/.faceted/facets/policies`
 - `~/.faceted/facets/compositions`
+- `~/.faceted/templates`
 
 ## `facet compose` Usage
 
@@ -48,7 +49,7 @@ When `~/.faceted` is already initialized, `facet compose` reuses existing config
 
 ### Compose Definition YAML
 
-Place definition files in `~/.faceted/facets/compositions/*.yaml`.
+Place definition files in `~/.faceted/compositions/*.yaml`.
 
 ```yaml
 name: release
@@ -71,6 +72,23 @@ order:
 - `persona` is always used for `systemPrompt` and is not order-controlled.
 
 `facet compose` itself no longer asks you to choose one of these definitions interactively. The CLI always includes `coder` + `coding` + `ai-antipattern` + `architecture`, then adds `frontend` / `backend` knowledge when related files indicate those areas.
+
+## `facet install skill` Sample Template
+
+First-run initialization also creates a sample multi-file template:
+
+- `~/.faceted/compositions/issue-worktree.yaml`
+- `~/.faceted/templates/issue-worktree/SKILL.md`
+- `~/.faceted/templates/issue-worktree/README.md`
+- `~/.faceted/templates/issue-worktree/templates/instructions/fix.md`
+- `~/.faceted/templates/issue-worktree/templates/instructions/review.md`
+
+`issue-worktree` is the reference example for template-backed skill installs.
+
+For non-template installs, `facet install skill` supports these targets:
+
+- `Claude Code` -> `~/.claude/skills/{name}/SKILL.md`
+- `Codex` -> `~/.codex/skills/{name}/SKILL.md`
 
 ## Quick Start
 

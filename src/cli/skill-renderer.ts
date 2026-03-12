@@ -186,6 +186,14 @@ function makeSkillHeader(definition: ComposeDefinition): string {
   return lines.join('\n');
 }
 
+export function renderSkillFrontmatter(definition: ComposeDefinition): string {
+  return `${makeSkillHeader(definition)}\n`;
+}
+
+export function hasYamlFrontmatter(content: string): boolean {
+  return /^---\n[\s\S]*?\n---(?:\n|$)/u.test(content);
+}
+
 function hasInstructionPath(instruction: InstructionSection): instruction is SkillSection {
   return instruction.ref !== 'literal';
 }

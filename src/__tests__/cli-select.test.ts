@@ -71,18 +71,15 @@ describe('selectInteractiveFromIO', () => {
     const output = new FakeOutput();
 
     const promise = selectInteractiveFromIO(
-      [
-        'Inline (embed facet contents into SKILL.md)',
-        'Reference (write facet file paths into SKILL.md)',
-      ],
+      ['Claude Code', 'Codex'],
       input as unknown as NodeJS.ReadStream & { setRawMode: (mode: boolean) => void },
       output as unknown as NodeJS.WriteStream,
-      'Choose skill mode with Up/Down and Enter:',
+      'Choose install target with Up/Down and Enter:',
     );
 
     input.emit('keypress', '', { name: 'return' });
 
-    await expect(promise).resolves.toBe('Inline (embed facet contents into SKILL.md)');
-    expect(output.writes.join('')).toContain('Choose skill mode with Up/Down and Enter:');
+    await expect(promise).resolves.toBe('Claude Code');
+    expect(output.writes.join('')).toContain('Choose install target with Up/Down and Enter:');
   });
 });

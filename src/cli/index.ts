@@ -9,8 +9,6 @@ import { buildFacetSet, ensureSafeDefinitionName } from './skill-renderer.js';
 import {
   getSkillPaths,
   runInstallSkillCommand,
-  runListSkillCommand,
-  runUpdateSkillCommand,
 } from './skill-commands.js';
 import type { FacetCliOptions, FacetCliResult } from './types.js';
 import { shouldOverwrite } from './install-skill/flow.js';
@@ -21,8 +19,6 @@ const USAGE = [
   'Commands:',
   '  compose              Compose facets into a prompt file',
   '  install skill        Install a skill from a composition',
-  '  update skill         Update installed skill(s)',
-  '  list skill           List installed skills',
 ].join('\n');
 
 function ensureCommand(command: string | undefined): string {
@@ -145,16 +141,6 @@ export async function runFacetCli(
   if (command === 'install') {
     ensureSkillSubcommand(command, subcommand);
     return runInstallSkillCommand(options);
-  }
-
-  if (command === 'update') {
-    ensureSkillSubcommand(command, subcommand);
-    return runUpdateSkillCommand(options);
-  }
-
-  if (command === 'list') {
-    ensureSkillSubcommand(command, subcommand);
-    return runListSkillCommand(options);
   }
 
   throw new Error(`Unsupported command: ${command}`);

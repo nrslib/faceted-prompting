@@ -2,7 +2,12 @@ import { mkdtempSync, mkdirSync, rmSync, symlinkSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { ensurePathWithinHome, ensurePathWithinRoots, isWithinRoot } from '../cli/path-guard.js';
+import {
+  ensurePathAncestorsContainNoSymbolicLinks,
+  ensurePathWithinHome,
+  ensurePathWithinRoots,
+  isWithinRoot,
+} from '../cli/path-guard.js';
 
 describe('path guard', () => {
   const tempDirs: string[] = [];
@@ -43,5 +48,19 @@ describe('path guard', () => {
     expect(isWithinRoot('/tmp/root', root)).toBe(true);
     expect(isWithinRoot('/tmp/root/child', root)).toBe(true);
     expect(isWithinRoot('/tmp/root-sibling', root)).toBe(false);
+  });
+
+  it('should reject paths with symbolic link ancestors', () => {
+    const baseDir = mkdtempSync(join(tmpdir(), 'path-guard-symlink-'));
+    tempDirs.push(baseDir);
+
+    const realDir = join(baseDir, 'real');
+    const linkDir = join(baseDir, 'link');
+    mkdirSync(realDir, { recursive: true });
+    symlinkSync(realDir, linkDir);
+
+    expect(() => ensurePathAncestorsContainNoSymbolicLinks(join(linkDir, 'nested'), 'Output directory', baseDir)).toThrow(
+      `Symbolic links are not allowed in Output directory path: ${linkDir}`,
+    );
   });
 });
