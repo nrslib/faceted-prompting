@@ -1,17 +1,29 @@
 # faceted-prompting
 
-Structured prompt composition for LLMs using the Faceted Prompting pattern.
+[Faceted Prompting 解説記事](https://nrslib.com/faceted-prompting)
 
-## Overview
+Structured prompt composition for LLMs — decompose prompts into reusable facets and compose them into LLM-ready messages.
 
-Faceted Prompting organizes LLM prompts into distinct facets:
+faceted-prompting separates prompt concerns into distinct facets (persona, policy, knowledge, instruction), each with a defined role and message placement. This keeps prompts modular, testable, and maintainable as they grow in complexity.
 
-| Facet | Role | Placement |
-|-------|------|-----------|
-| **Persona** | WHO — defines the agent's identity | System prompt |
-| **Policy** | HOW — coding standards, rules | User message |
-| **Knowledge** | WHAT TO KNOW — domain context | User message |
-| **Instruction** | WHAT TO DO — the task itself | User message |
+## Why Faceted Prompting
+
+**Separation of concerns** — Each facet has a single responsibility. Persona defines *who* the agent is, policies define *how* it should behave, knowledge provides *what it needs to know*, and instructions define *what to do*. Changes to one facet don't affect others.
+
+**Deterministic placement** — Persona always goes to the system prompt. Policies, knowledge, and instructions always go to the user message. This placement rule is enforced by the library, not left to convention.
+
+**Composable** — Facets are plain Markdown files. Mix and match personas, policies, and knowledge across different workflows. Share them as repertoire packages via `@owner/repo/facet-name` scope references.
+
+**Framework-independent** — Zero dependencies on any specific AI framework. Use it with Claude, OpenAI, or any LLM provider.
+
+## Facet Kinds
+
+| Facet | Placement | Role |
+|-------|-----------|------|
+| **Persona** | System prompt | WHO — agent identity and character |
+| **Policy** | User message | HOW — rules, standards, constraints |
+| **Knowledge** | User message | WHAT TO KNOW — domain context, architecture |
+| **Instruction** | User message | WHAT TO DO — the specific task |
 
 ## Install
 
@@ -26,30 +38,62 @@ npm install -g faceted-prompting
 facet compose
 ```
 
-First run initializes `~/.faceted`:
+## Quick Start
 
-- `~/.faceted/config.yaml`
-- `~/.faceted/facets/persona`
-- `~/.faceted/facets/knowledge`
-- `~/.faceted/facets/policies`
-- `~/.faceted/facets/compositions`
-- `~/.faceted/templates`
+### As a library
 
-## `facet compose` Usage
+```typescript
+import { compose } from 'faceted-prompting';
 
-1. Run `facet compose`.
-2. `facet compose` detects related files from the current working tree and automatically selects `coding` / `frontend` / `backend`.
-3. Confirm output directory (default: current working directory) or type another path.
-4. Choose output mode:
-   - `Combined (single file)` writes `{name}.md`
-   - `Split (system + user)` writes `{name}.system.md` and `{name}.user.md`
-5. If the target file already exists, confirm overwrite (`y`/`yes` to overwrite).
+const result = compose(
+  {
+    persona: { body: 'You are a senior TypeScript developer.' },
+    policies: [{ body: 'Follow clean code principles. No any types.' }],
+    knowledge: [{ body: 'The project uses Vitest for testing.' }],
+    instruction: { body: 'Implement a retry function with exponential backoff.' },
+  },
+  { contextMaxChars: 8000 },
+);
 
-When `~/.faceted` is already initialized, `facet compose` reuses existing config/templates and does not overwrite files.
+// result.systemPrompt → "You are a senior TypeScript developer."
+// result.userMessage  → policies + knowledge + instruction (in order)
+```
 
-### Compose Definition YAML
+### As a CLI
 
-Place definition files in `~/.faceted/compositions/*.yaml`.
+```bash
+# Compose prompts with auto-detected context
+facet compose
+
+# Install a skill to Claude Code or Codex
+facet install skill
+```
+
+First run initializes `~/.faceted/`:
+
+```
+~/.faceted/
+├── config.yaml
+├── facets/
+│   ├── persona/          # Persona Markdown files
+│   ├── knowledge/        # Domain knowledge files
+│   ├── policies/         # Policy/rules files
+│   └── compositions/     # Compose definition YAML files
+└── templates/            # Skill templates
+```
+
+## CLI Commands
+
+| Command | Description |
+|---------|-------------|
+| `facet compose` | Auto-detect context, compose prompts, and write to files |
+| `facet install skill` | Install a skill with facets to a target (Claude Code, Codex, template) |
+
+See the [CLI Reference](./docs/cli-reference.md) for details.
+
+## Compose Definition
+
+Place definition files in `~/.faceted/compositions/*.yaml`:
 
 ```yaml
 name: release
@@ -66,54 +110,31 @@ order:
   - instruction
 ```
 
-- `name` is required.
-- `description` is optional.
-- `order` applies only to user-message sections (`knowledge`, `policies`, `instruction`).
-- `persona` is always used for `systemPrompt` and is not order-controlled.
+- `name` and `persona` are required.
+- `order` controls user-message section order (default: `policies` → `knowledge` → `instruction`).
+- `instruction` can be a facet file reference or inline text.
 
-`facet compose` itself no longer asks you to choose one of these definitions interactively. The CLI always includes `coder` + `coding` + `ai-antipattern` + `architecture`, then adds `frontend` / `backend` knowledge when related files indicate those areas.
+## Scope References
 
-## `facet install skill` Sample Template
+Reference facets from installed repertoire packages using `@owner/repo/facet-name` syntax:
 
-First-run initialization also creates a sample multi-file template:
-
-- `~/.faceted/compositions/issue-worktree.yaml`
-- `~/.faceted/templates/issue-worktree/SKILL.md`
-- `~/.faceted/templates/issue-worktree/README.md`
-- `~/.faceted/templates/issue-worktree/templates/instructions/fix.md`
-- `~/.faceted/templates/issue-worktree/templates/instructions/review.md`
-
-`issue-worktree` is the reference example for template-backed skill installs.
-
-For non-template installs, `facet install skill` supports these targets:
-
-- `Claude Code` -> `~/.claude/skills/{name}/SKILL.md`
-- `Codex` -> `~/.codex/skills/{name}/SKILL.md`
-
-## Quick Start
-
-```typescript
-import { compose } from 'faceted-prompting';
-
-const result = compose(
-  {
-    persona: { body: 'You are a senior TypeScript developer.' },
-    policies: [{ body: 'Follow clean code principles. No any types.' }],
-    knowledge: [{ body: 'The project uses Vitest for testing.' }],
-    instruction: { body: 'Implement a retry function with exponential backoff.' },
-  },
-  { contextMaxChars: 8000 },
-);
-
-// result.systemPrompt → persona content
-// result.userMessage  → policy + knowledge + instruction (in order)
+```yaml
+persona: "@nrslib/takt-fullstack/expert-coder"
+knowledge:
+  - "@nrslib/takt-fullstack/architecture"
 ```
+
+Scope references resolve to `~/.faceted/repertoire/@{owner}/{repo}/facets/{kind}/{name}.md`.
 
 ## API
 
 ### `compose(facets, options)`
 
-Composes a `FacetSet` into a `ComposedPrompt` with `systemPrompt` and `userMessage`.
+Core composition function. Takes a `FacetSet` and `ComposeOptions`, returns a `ComposedPrompt` with `systemPrompt` and `userMessage`.
+
+### `composePromptPayload(params)`
+
+Higher-level API that composes prompts from a `ComposeDefinition` and also returns `copyFiles` metadata listing the source file paths used.
 
 ### `FileDataEngine`
 
@@ -128,16 +149,54 @@ const persona = await engine.resolve('personas', 'coder');
 
 ### `CompositeDataEngine`
 
-Chains multiple engines with first-match-wins resolution.
+Chains multiple `DataEngine` instances with first-match-wins resolution. Useful for layering project-level facets over global defaults.
+
+```typescript
+import { FileDataEngine, CompositeDataEngine } from 'faceted-prompting';
+
+const engine = new CompositeDataEngine([
+  new FileDataEngine('./project/facets'),   // project-level (wins)
+  new FileDataEngine('~/.faceted/facets'),   // global fallback
+]);
+```
 
 ### `renderTemplate(template, vars)`
 
-Minimal template engine supporting `{{#if}}...{{else}}...{{/if}}` and `{{variable}}` substitution.
+Minimal template engine with `{{variable}}` substitution and `{{#if var}}...{{else}}...{{/if}}` conditionals.
 
 ### `escapeTemplateChars(str)`
 
-Escapes curly braces to prevent template injection.
+Escapes curly braces to full-width Unicode equivalents to prevent template injection in user-supplied content.
+
+See the [API Reference](./docs/api-reference.md) for the full API surface.
+
+## Project Structure
+
+```
+~/.faceted/                     # Global config (created on first run)
+├── config.yaml
+├── facets/
+│   ├── persona/
+│   ├── knowledge/
+│   ├── policies/
+│   └── compositions/
+├── templates/                  # Skill install templates
+└── repertoire/                 # Installed repertoire packages
+```
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [Concepts](./docs/concepts.md) | Faceted Prompting design methodology |
+| [CLI Reference](./docs/cli-reference.md) | All commands and options |
+| [API Reference](./docs/api-reference.md) | Library API surface |
+| [Changelog](./CHANGELOG.md) | Version history |
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
 
 ## License
 
-MIT
+MIT — See [LICENSE](./LICENSE) for details.
