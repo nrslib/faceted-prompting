@@ -4,15 +4,25 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-12
+
 ### Added
-- `composePromptPayload()` API for composing prompts with copy-file metadata
-- `ComposedPromptPayload` and `CopyFiles` types
+- `facet init` command for standalone initialization of `~/.faceted/` directory structure
+- `facet pull-sample` command to fetch sample coding facets from TAKT on GitHub
+- `facet compose` がワーキングツリーからプロジェクトコンテキスト（coding/frontend/backend）を自動検出
+- `composePromptPayload()` API — プロンプト合成とコピー対象ファイルのメタデータを一括取得
+- `ComposedPromptPayload` / `CopyFiles` 型を追加
+- `traced-config` による設定バリデーションとレイヤード優先度解決
 
 ### Changed
-- Skill install flow uses `composePromptPayload()` for centralized file resolution
-- `copyFacetFiles()` accepts `CopyFiles` instead of `SkillSections`
-- `facet compose` auto-detects project context (coding/frontend/backend) from working tree
-- Skill install flow simplified to template-based integration
+- `facet compose` / `facet install skill` の実行前に `facet init` が必須に
+- `setup` コマンドを `pull-sample` に置換 — サンプルファセットをバンドルではなく GitHub から取得する方式に変更
+- `facet install skill` のターゲットから Template を削除し、Claude Code / Codex のみに
+- スキルインストールフローを `composePromptPayload()` ベースに統合し簡素化
+
+### Internal
+- ドキュメント整備: README 全面リライト、CLI/API/Concepts リファレンス、CONTRIBUTING.md 追加
+- init, compose, setup, skill install, config, facet modes のテストカバレッジを追加
 
 ## [0.1.0] - 2026-02-14
 
