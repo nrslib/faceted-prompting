@@ -24,13 +24,13 @@ npm install -g faceted-prompting
 └── repertoire/                  # Installed scope packages
 ```
 
-Compositions and the sample template (`issue-worktree`) are created during initialization. Actual sample facets are pulled separately.
+Only the directory structure and config are created during initialization. Sample facets, compositions, and templates are pulled separately via `facet pull-sample`.
 
 ## Commands
 
 ### `facet init`
 
-Create local config, sample facets, compositions, and templates.
+Create local config and empty facet directories.
 
 ```bash
 facet init
@@ -38,7 +38,7 @@ facet init
 
 ### `facet pull-sample`
 
-Fetch the sample coding facets from TAKT on GitHub and install them into `~/.faceted/`.
+Fetch sample coding facets, compositions, and templates from TAKT on GitHub and install them into `~/.faceted/`.
 
 ```bash
 facet pull-sample

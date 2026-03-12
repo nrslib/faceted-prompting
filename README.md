@@ -76,7 +76,7 @@ facet compose
 facet install skill
 ```
 
-`facet init` creates `~/.faceted/` with config, directories, compositions, and templates:
+`facet init` creates `~/.faceted/` with config and empty directories. Run `facet pull-sample` to populate sample facets, compositions, and templates:
 
 ```
 ~/.faceted/
@@ -93,7 +93,7 @@ facet install skill
 
 | Command | Description |
 |---------|-------------|
-| `facet init` | Create local config, facet directories, compositions, and templates |
+| `facet init` | Create local config and empty facet directories |
 | `facet pull-sample` | Pull sample coding facets from TAKT on GitHub |
 | `facet compose` | Auto-detect context, compose prompts, and write to files |
 | `facet install skill` | Install a skill with facets to Claude Code or Codex |
