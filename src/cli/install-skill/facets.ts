@@ -1,11 +1,13 @@
 import { basename, join } from 'node:path';
 import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import type { buildSkillSections } from '../skill-renderer.js';
+import type { CopyFiles } from '../../types.js';
 
 const FACET_TOKEN_PATTERN = /{{facet:(persona|knowledges|policies|instructions)}}/g;
 const FACET_TOKEN_TEST = /{{facet:(persona|knowledges|policies|instructions)}}/;
 
 type FacetPlaceholderKey = 'persona' | 'knowledges' | 'policies' | 'instructions';
+type FacetTokenValues = Record<FacetPlaceholderKey, string>;
 
 export type SkillSections = ReturnType<typeof buildSkillSections>;
 
@@ -44,25 +46,18 @@ function normalizeInstructionBody(body: string): string {
   return body.endsWith('\n') ? body : `${body}\n`;
 }
 
-function renderFacetTokenValue(key: FacetPlaceholderKey, facets: FacetPathMap): string {
-  if (key === 'persona') {
-    return facets.persona;
-  }
-  if (key === 'knowledges') {
-    return facets.knowledges.join('\n');
-  }
-  if (key === 'policies') {
-    return facets.policies.join('\n');
-  }
-  if (!facets.instructions) {
-    throw new Error('Missing instructions facet path for {{facet:instructions}} placeholder');
-  }
-  return facets.instructions;
+export function buildInlineFacetTokenValues(sections: SkillSections): FacetTokenValues {
+  return {
+    persona: sections.persona.body,
+    knowledges: sections.knowledge.map(knowledge => knowledge.body).join('\n'),
+    policies: sections.policies.map(policy => policy.body).join('\n'),
+    instructions: sections.instruction ? sections.instruction.body : '',
+  };
 }
 
-function replaceFacetTokens(content: string, facets: FacetPathMap): string {
+function replaceFacetTokens(content: string, values: FacetTokenValues): string {
   return content.replaceAll(FACET_TOKEN_PATTERN, (_match, token: FacetPlaceholderKey) => {
-    return renderFacetTokenValue(token, facets);
+    return values[token];
   });
 }
 
@@ -119,7 +114,8 @@ export function buildSectionsWithCopiedPaths(
 export function copyFacetFiles(params: {
   targetDir: string;
   safeSkillName: string;
-  sections: SkillSections;
+  copyFiles: CopyFiles;
+  literalInstructionBody?: string;
 }): FacetPathMap {
   const facetsDir = join(params.targetDir, 'facets');
   const personaDir = join(facetsDir, 'persona');
@@ -131,30 +127,35 @@ export function copyFacetFiles(params: {
   mkdirSync(knowledgeDir, { recursive: true });
   mkdirSync(policiesDir, { recursive: true });
 
-  const personaPath = join(personaDir, basename(params.sections.persona.path));
-  copyFileSync(params.sections.persona.path, personaPath);
+  const sourcePersonaPath = params.copyFiles.persona[0];
+  if (!sourcePersonaPath) {
+    throw new Error('Missing persona copy file path');
+  }
+  const personaPath = join(personaDir, basename(sourcePersonaPath));
+  copyFileSync(sourcePersonaPath, personaPath);
 
-  const knowledgePaths = params.sections.knowledge.map(knowledge => {
-    const targetPath = join(knowledgeDir, basename(knowledge.path));
-    copyFileSync(knowledge.path, targetPath);
+  const knowledgePaths = params.copyFiles.knowledge.map(path => {
+    const targetPath = join(knowledgeDir, basename(path));
+    copyFileSync(path, targetPath);
     return targetPath;
   });
 
-  const policyPaths = params.sections.policies.map(policy => {
-    const targetPath = join(policiesDir, basename(policy.path));
-    copyFileSync(policy.path, targetPath);
+  const policyPaths = params.copyFiles.policies.map(path => {
+    const targetPath = join(policiesDir, basename(path));
+    copyFileSync(path, targetPath);
     return targetPath;
   });
 
   let instructionPath: string | undefined;
-  if (params.sections.instruction) {
+  const sourceInstructionPath = params.copyFiles.instructions[0];
+  if (sourceInstructionPath || params.literalInstructionBody) {
     mkdirSync(instructionsDir, { recursive: true });
-    if (!('path' in params.sections.instruction)) {
-      instructionPath = join(instructionsDir, `${params.safeSkillName}.md`);
-      writeFileSync(instructionPath, normalizeInstructionBody(params.sections.instruction.body), 'utf-8');
+    if (sourceInstructionPath) {
+      instructionPath = join(instructionsDir, basename(sourceInstructionPath));
+      copyFileSync(sourceInstructionPath, instructionPath);
     } else {
-      instructionPath = join(instructionsDir, basename(params.sections.instruction.path));
-      copyFileSync(params.sections.instruction.path, instructionPath);
+      instructionPath = join(instructionsDir, `${params.safeSkillName}.md`);
+      writeFileSync(instructionPath, normalizeInstructionBody(params.literalInstructionBody ?? ''), 'utf-8');
     }
   }
 
@@ -169,10 +170,10 @@ export function copyFacetFiles(params: {
 export function applyFacetTokensToPath(params: {
   rootDir: string;
   maxDepth: number;
-  facets: FacetPathMap;
+  tokenValues: FacetTokenValues;
   excludeDirs: readonly string[];
 }): void {
-  const { rootDir, maxDepth, facets, excludeDirs } = params;
+  const { rootDir, maxDepth, tokenValues, excludeDirs } = params;
 
   const visit = (currentDir: string, depth: number): void => {
     for (const entry of readdirSync(currentDir, { withFileTypes: true })) {
@@ -200,7 +201,7 @@ export function applyFacetTokensToPath(params: {
         continue;
       }
 
-      const replaced = replaceFacetTokens(original, facets);
+      const replaced = replaceFacetTokens(original, tokenValues);
       if (replaced !== original) {
         writeFileSync(entryPath, replaced, 'utf-8');
       }

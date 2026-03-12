@@ -26,14 +26,14 @@ describe('writeComposeOutput', () => {
     try {
       const outsidePath = join(workspaceDir, 'outside.md');
       const outputDir = join(workspaceDir, 'out');
-      const symlinkPath = join(outputDir, 'result.prompt.md');
+      const symlinkPath = join(outputDir, 'result.md');
       mkdirSync(outputDir, { recursive: true });
       writeFileSync(outsidePath, 'outside', 'utf-8');
       symlinkSync(outsidePath, symlinkPath);
 
       await expect(writeComposeOutput({
         outputDir,
-        fileName: 'result.prompt.md',
+        fileName: 'result.md',
         content: 'updated',
         overwrite: true,
       })).rejects.toThrow('Symbolic links are not allowed for output file');

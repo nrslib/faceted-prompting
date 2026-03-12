@@ -10,15 +10,15 @@ export function resolveOutputDirectory(inputValue: string, defaultDirectory: str
   return resolve(defaultDirectory, trimmed);
 }
 
-export function formatComposedOutput(composed: ComposedPrompt): string {
-  return [
-    '# System Prompt',
-    composed.systemPrompt,
-    '',
-    '# User Message',
-    composed.userMessage,
-    '',
-  ].join('\n');
+export function formatCombinedOutput(composed: ComposedPrompt): string {
+  const parts: string[] = [];
+  if (composed.systemPrompt.length > 0) {
+    parts.push(composed.systemPrompt);
+  }
+  if (composed.userMessage.length > 0) {
+    parts.push(composed.userMessage);
+  }
+  return parts.join('\n\n') + '\n';
 }
 
 export async function writeComposeOutput(options: {

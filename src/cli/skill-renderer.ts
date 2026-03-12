@@ -149,10 +149,14 @@ export function buildFacetSet(params: {
   const resolved = resolveDefinitionSections(params);
 
   return {
-    persona: { body: resolved.persona.body },
-    policies: resolved.policies.map(policy => ({ body: policy.body })),
-    knowledge: resolved.knowledge.map(item => ({ body: item.body })),
-    instruction: resolved.instruction ? { body: resolved.instruction.body } : undefined,
+    persona: { body: resolved.persona.body, sourcePath: resolved.persona.path },
+    policies: resolved.policies.map(policy => ({ body: policy.body, sourcePath: policy.path })),
+    knowledge: resolved.knowledge.map(item => ({ body: item.body, sourcePath: item.path })),
+    instruction: resolved.instruction
+      ? ('path' in resolved.instruction
+          ? { body: resolved.instruction.body, sourcePath: resolved.instruction.path }
+          : { body: resolved.instruction.body })
+      : undefined,
   };
 }
 
@@ -180,6 +184,14 @@ function makeSkillHeader(definition: ComposeDefinition): string {
   }
   lines.push('---');
   return lines.join('\n');
+}
+
+export function renderSkillFrontmatter(definition: ComposeDefinition): string {
+  return `${makeSkillHeader(definition)}\n`;
+}
+
+export function hasYamlFrontmatter(content: string): boolean {
+  return /^---\n[\s\S]*?\n---(?:\n|$)/u.test(content);
 }
 
 function hasInstructionPath(instruction: InstructionSection): instruction is SkillSection {

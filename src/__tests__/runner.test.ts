@@ -28,15 +28,15 @@ describe('runner', () => {
     expect(exitCode).toBeUndefined();
   });
 
-  it('should print text output when runFacetCli returns text result', async () => {
+  it('should print generated paths when runFacetCli returns paths result', async () => {
     const stdout: string[] = [];
     const stderr: string[] = [];
     let exitCode: number | undefined;
 
-    await runMain(['list', 'skill'], {
+    await runMain(['compose'], {
       runFacetCli: async () => ({
-        kind: 'text',
-        text: 'cc\n- coding (mode: inline, source: coding.yaml, output: ~/.claude/skills/coding/SKILL.md)',
+        kind: 'paths',
+        paths: ['/tmp/coding.system.md', '/tmp/coding.user.md'],
       }),
       writeStdout: message => {
         stdout.push(message);
@@ -49,9 +49,33 @@ describe('runner', () => {
       },
     });
 
-    expect(stdout).toEqual([
-      'cc\n- coding (mode: inline, source: coding.yaml, output: ~/.claude/skills/coding/SKILL.md)\n',
-    ]);
+    expect(stdout).toEqual(['Generated:\n- /tmp/coding.system.md\n- /tmp/coding.user.md\n']);
+    expect(stderr).toEqual([]);
+    expect(exitCode).toBeUndefined();
+  });
+
+  it('should print text output when runFacetCli returns text result', async () => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    let exitCode: number | undefined;
+
+    await runMain(['init'], {
+      runFacetCli: async () => ({
+        kind: 'text',
+        text: 'Initialized: /tmp/home/.faceted',
+      }),
+      writeStdout: message => {
+        stdout.push(message);
+      },
+      writeStderr: message => {
+        stderr.push(message);
+      },
+      setExitCode: code => {
+        exitCode = code;
+      },
+    });
+
+    expect(stdout).toEqual(['Initialized: /tmp/home/.faceted\n']);
     expect(stderr).toEqual([]);
     expect(exitCode).toBeUndefined();
   });

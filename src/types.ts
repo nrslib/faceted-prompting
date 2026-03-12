@@ -46,6 +46,19 @@ export interface ComposedPrompt {
   readonly userMessage: string;
 }
 
+export interface CopyFiles {
+  readonly persona: readonly string[];
+  readonly knowledge: readonly string[];
+  readonly policies: readonly string[];
+  readonly instructions: readonly string[];
+}
+
+export interface ComposedPromptPayload {
+  readonly systemPrompt: string;
+  readonly userPrompt: string;
+  readonly copyFiles: CopyFiles;
+}
+
 /** User-message sections that can be ordered in compose definitions. */
 export type ComposeOrderEntry = 'policies' | 'knowledge' | 'instruction';
 

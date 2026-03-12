@@ -8,6 +8,7 @@ type SelectModule = {
     candidates: string[],
     inStream: NodeJS.ReadStream & { setRawMode: (mode: boolean) => void },
     outStream: NodeJS.WriteStream,
+    prompt?: string,
   ) => Promise<string>;
 };
 
@@ -62,5 +63,23 @@ describe('selectInteractiveFromIO', () => {
       input as unknown as NodeJS.ReadStream & { setRawMode: (mode: boolean) => void },
       output as unknown as NodeJS.WriteStream,
     )).rejects.toThrow('requires a TTY');
+  });
+
+  it('should render custom prompt when provided', async () => {
+    const { selectInteractiveFromIO } = await loadSelectModule();
+    const input = new FakeInput();
+    const output = new FakeOutput();
+
+    const promise = selectInteractiveFromIO(
+      ['Claude Code', 'Codex'],
+      input as unknown as NodeJS.ReadStream & { setRawMode: (mode: boolean) => void },
+      output as unknown as NodeJS.WriteStream,
+      'Choose install target with Up/Down and Enter:',
+    );
+
+    input.emit('keypress', '', { name: 'return' });
+
+    await expect(promise).resolves.toBe('Claude Code');
+    expect(output.writes.join('')).toContain('Choose install target with Up/Down and Enter:');
   });
 });

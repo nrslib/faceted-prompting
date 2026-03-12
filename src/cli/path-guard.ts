@@ -56,16 +56,20 @@ function findNearestExistingAncestor(path: string): string {
   return current;
 }
 
-export function ensurePathAncestorsAndRealPathWithinHome(
+export function ensurePathAncestorsContainNoSymbolicLinks(
   path: string,
-  homeDir: string,
   label: string,
-): { resolvedPath: string; homeRealPath: string } {
-  const { resolvedPath, homeRealPath } = ensurePathWithinHome(path, homeDir, label);
-  const resolvedHomeDir = resolve(homeDir);
+  stopAtPath?: string,
+): string {
+  const resolvedPath = resolve(path);
+  const resolvedStopAtPath = stopAtPath ? resolve(stopAtPath) : undefined;
 
   let current = resolvedPath;
-  while (isWithinRoot(current, resolvedHomeDir)) {
+  while (true) {
+    if (resolvedStopAtPath && !isWithinRoot(current, resolvedStopAtPath)) {
+      break;
+    }
+
     if (existsSync(current)) {
       const stat = lstatSync(current);
       if (stat.isSymbolicLink()) {
@@ -73,11 +77,27 @@ export function ensurePathAncestorsAndRealPathWithinHome(
       }
     }
 
-    if (current === resolvedHomeDir) {
+    const parent = dirname(current);
+    if (parent === current) {
       break;
     }
-    current = dirname(current);
+    if (resolvedStopAtPath && current === resolvedStopAtPath) {
+      break;
+    }
+    current = parent;
   }
+
+  return resolvedPath;
+}
+
+export function ensurePathAncestorsAndRealPathWithinHome(
+  path: string,
+  homeDir: string,
+  label: string,
+): { resolvedPath: string; homeRealPath: string } {
+  const { resolvedPath, homeRealPath } = ensurePathWithinHome(path, homeDir, label);
+  const resolvedHomeDir = resolve(homeDir);
+  ensurePathAncestorsContainNoSymbolicLinks(resolvedPath, label, resolvedHomeDir);
 
   const existingAncestor = findNearestExistingAncestor(resolvedPath);
   const ancestorRealPath = realpathSync(existingAncestor);

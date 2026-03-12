@@ -1,17 +1,7 @@
 import type { ComposeDefinition } from '../types.js';
 
 export type SkillMode = 'inline' | 'reference';
-
-export interface SkillEntry {
-  readonly source: string;
-  readonly mode: SkillMode;
-  readonly output: string;
-  readonly cc?: {
-    readonly 'user-invocable'?: boolean;
-  };
-}
-
-export type SkillsRegistry = Record<string, Record<string, SkillEntry>>;
+export type InstallTarget = 'cc' | 'codex';
 
 export interface FacetRefContent {
   readonly body: string;
