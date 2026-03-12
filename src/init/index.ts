@@ -178,7 +178,10 @@ async function fetchBootstrapContent(remoteRelativePath: string, fetchImpl: Fetc
 
 export function listPullSampleTargetPaths(homeDir: string): string[] {
   const facetedRoot = getFacetedRoot(homeDir);
-  return BOOTSTRAP_TARGETS.map(target => join(facetedRoot, target.localRelativePath));
+  return [
+    ...BOOTSTRAP_TARGETS.map(target => join(facetedRoot, target.localRelativePath)),
+    ...DEFAULT_TEMPLATES.map(template => join(facetedRoot, template.relativePath)),
+  ];
 }
 
 async function bootstrapDefaultFacets(facetedRoot: string, fetchImpl: FetchLike, overwrite: boolean): Promise<void> {
@@ -190,6 +193,18 @@ async function bootstrapDefaultFacets(facetedRoot: string, fetchImpl: FetchLike,
     const content = await fetchBootstrapContent(target.remoteRelativePath, fetchImpl);
     mkdirSync(dirname(targetPath), { recursive: true });
     writeFileSync(targetPath, content, 'utf-8');
+  }
+}
+
+function writeDefaultSampleFiles(facetedRoot: string, overwrite: boolean): void {
+  for (const template of DEFAULT_TEMPLATES) {
+    const targetPath = join(facetedRoot, template.relativePath);
+    if (existsSync(targetPath) && !overwrite) {
+      continue;
+    }
+
+    mkdirSync(dirname(targetPath), { recursive: true });
+    writeFileSync(targetPath, template.content, 'utf-8');
   }
 }
 
@@ -207,18 +222,12 @@ export async function initializeFacetedHome(options: { homeDir: string }): Promi
   for (const dirName of REQUIRED_FACET_DIRS) {
     mkdirSync(join(facetsRoot, dirName), { recursive: true });
   }
-
-  for (const template of DEFAULT_TEMPLATES) {
-    const targetPath = join(facetedRoot, template.relativePath);
-    if (!existsSync(targetPath)) {
-      mkdirSync(dirname(targetPath), { recursive: true });
-      writeFileSync(targetPath, template.content, 'utf-8');
-    }
-  }
 }
 
 export async function pullSampleFacets(options: { homeDir: string; fetchImpl?: FetchLike; overwrite?: boolean }): Promise<void> {
   await initializeFacetedHome({ homeDir: options.homeDir });
   const facetedRoot = getFacetedRoot(options.homeDir);
-  await bootstrapDefaultFacets(facetedRoot, resolveFetchImpl(options.fetchImpl), options.overwrite ?? false);
+  const overwrite = options.overwrite ?? false;
+  writeDefaultSampleFiles(facetedRoot, overwrite);
+  await bootstrapDefaultFacets(facetedRoot, resolveFetchImpl(options.fetchImpl), overwrite);
 }

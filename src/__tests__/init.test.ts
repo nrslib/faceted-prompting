@@ -1,6 +1,6 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
@@ -45,7 +45,7 @@ describe('initializeFacetedHome', () => {
     expect(existsSync(join(homeDir, '.faceted', 'templates'))).toBe(true);
   });
 
-  it('should create default templates on first run', async () => {
+  it('should create empty composition and template directories on first run', async () => {
     const homeDir = mkdtempSync(join(tmpdir(), 'faceted-home-'));
     tempDirs.push(homeDir);
 
@@ -57,16 +57,13 @@ describe('initializeFacetedHome', () => {
     expect(existsSync(join(facetsRoot, 'persona', 'coder.md'))).toBe(false);
     expect(existsSync(join(facetsRoot, 'knowledge', 'architecture.md'))).toBe(false);
     expect(existsSync(join(facetsRoot, 'policies', 'coding.md'))).toBe(false);
-    expect(existsSync(join(facetedRoot, 'compositions', 'coding.yaml'))).toBe(true);
-    expect(existsSync(join(facetedRoot, 'compositions', 'issue-worktree.yaml'))).toBe(true);
-    expect(existsSync(join(facetedRoot, 'templates', 'issue-worktree', 'SKILL.md'))).toBe(true);
-    expect(existsSync(join(facetedRoot, 'templates', 'issue-worktree', 'README.md'))).toBe(true);
-    expect(
-      existsSync(join(facetedRoot, 'templates', 'issue-worktree', 'templates', 'instructions', 'fix.md')),
-    ).toBe(true);
+    expect(existsSync(join(facetedRoot, 'compositions', 'coding.yaml'))).toBe(false);
+    expect(existsSync(join(facetedRoot, 'compositions', 'issue-worktree.yaml'))).toBe(false);
+    expect(existsSync(join(facetedRoot, 'templates', 'issue-worktree', 'SKILL.md'))).toBe(false);
+    expect(existsSync(join(facetedRoot, 'templates', 'issue-worktree', 'README.md'))).toBe(false);
   });
 
-  it('should install the default issue-worktree sample template content', async () => {
+  it('should not install sample composition or template content during init', async () => {
     const homeDir = mkdtempSync(join(tmpdir(), 'faceted-home-'));
     tempDirs.push(homeDir);
 
@@ -74,13 +71,8 @@ describe('initializeFacetedHome', () => {
     await initializeFacetedHome({ homeDir });
 
     const facetedRoot = join(homeDir, '.faceted');
-    const compositionBody = readFileSync(join(facetedRoot, 'compositions', 'issue-worktree.yaml'), 'utf-8');
-    const skillTemplateBody = readFileSync(join(facetedRoot, 'templates', 'issue-worktree', 'SKILL.md'), 'utf-8');
-
-    expect(compositionBody).toContain('template: issue-worktree');
-    expect(skillTemplateBody).toContain('{{facet:persona}}');
-    expect(skillTemplateBody).toContain('{{facet:policies}}');
-    expect(skillTemplateBody).toContain('{{facet:knowledges}}');
+    expect(existsSync(join(facetedRoot, 'compositions', 'issue-worktree.yaml'))).toBe(false);
+    expect(existsSync(join(facetedRoot, 'templates', 'issue-worktree', 'SKILL.md'))).toBe(false);
   });
 
   it('should initialize config with extensible skillPaths field', async () => {
@@ -123,7 +115,8 @@ describe('initializeFacetedHome', () => {
     const { initializeFacetedHome } = await loadInitModule();
     await initializeFacetedHome({ homeDir });
 
-    const personaTemplatePath = join(homeDir, '.faceted', 'templates', 'issue-worktree', 'SKILL.md');
+    const personaTemplatePath = join(homeDir, '.faceted', 'templates', 'custom', 'SKILL.md');
+    mkdirSync(dirname(personaTemplatePath), { recursive: true });
     const customPersonaTemplate = 'Custom persona template';
     writeFileSync(personaTemplatePath, customPersonaTemplate, 'utf-8');
 
@@ -186,6 +179,10 @@ describe('pullSampleFacets', () => {
       '# Remote Architecture\n',
     );
     expect(readFileSync(join(homeDir, '.faceted', 'facets', 'policies', 'coding.md'), 'utf-8')).toBe('# Remote Coding\n');
+    expect(readFileSync(join(homeDir, '.faceted', 'compositions', 'coding.yaml'), 'utf-8')).toContain('name: coding');
+    expect(readFileSync(join(homeDir, '.faceted', 'templates', 'issue-worktree', 'SKILL.md'), 'utf-8')).toContain(
+      '{{facet:persona}}',
+    );
   });
 
   it('should skip existing facet files unless overwrite is requested', async () => {

@@ -71,7 +71,7 @@ export async function runTemplateApplyInstall(params: {
     promptLabel: 'Facets directory',
   });
 
-  const facetPaths = copyFacetFiles({
+  copyFacetFiles({
     targetDir,
     safeSkillName: params.safeSkillName,
     copyFiles: payload.copyFiles,
@@ -142,7 +142,7 @@ export async function runSkillDeployInstall(params: {
   if (templateDir) {
     copyDirectoryTree(templateDir, targetDir);
 
-    const facetPaths = copyFacetFiles({
+    copyFacetFiles({
       targetDir,
       safeSkillName: params.safeSkillName,
       copyFiles: payload.copyFiles,
@@ -165,7 +165,7 @@ export async function runSkillDeployInstall(params: {
       homeDir: params.options.homeDir,
     });
   } else {
-    const copiedFacetPaths = copyFacetFiles({
+    copyFacetFiles({
       targetDir,
       safeSkillName: params.safeSkillName,
       copyFiles: payload.copyFiles,

@@ -45,6 +45,7 @@
     "@types/node": "^22.19.11",
     "eslint": "^9.0.0",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.0",
     "vitest": "^3.2.4"
   },
   "dependencies": {

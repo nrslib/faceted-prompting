@@ -2,7 +2,7 @@
  * Unit tests for faceted-prompting DataEngine implementations.
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { FileDataEngine, CompositeDataEngine } from '../index.js';
 import type { DataEngine, FacetKind } from '../index.js';
 

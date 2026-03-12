@@ -127,6 +127,22 @@ describe('facet skill integration flow', () => {
     })).rejects.toThrow(`Missing faceted config: ${join(homeDir, '.faceted', 'config.yaml')}`);
   });
 
+  it('should not offer compositions immediately after init', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    const { runFacetCli } = await loadCliModule();
+    await runInit(runFacetCli, workspaceDir, homeDir);
+
+    await expect(runFacetCli(['install', 'skill'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: async () => 'unused',
+      input: async (_prompt, defaultValue) => defaultValue,
+    })).rejects.toThrow(`No compose definitions found in ${join(homeDir, '.faceted', 'compositions')}`);
+  });
+
   it('should install skill to default Claude Code output path when default input is accepted', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
@@ -202,7 +218,6 @@ describe('facet skill integration flow', () => {
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
 
-    const defaultSkillOutputPath = join(homeDir, '.codex', 'skills', 'coding', 'SKILL.md');
     const { runFacetCli } = await loadCliModule();
     const seenPrompts: string[] = [];
     await runInit(runFacetCli, workspaceDir, homeDir);

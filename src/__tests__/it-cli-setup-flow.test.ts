@@ -51,7 +51,7 @@ describe('facet init/pull-sample integration flow', () => {
       text: `Initialized: ${join(homeDir, '.faceted')}`,
     });
     expect(existsSync(join(homeDir, '.faceted', 'config.yaml'))).toBe(true);
-    expect(existsSync(join(homeDir, '.faceted', 'compositions', 'coding.yaml'))).toBe(true);
+    expect(existsSync(join(homeDir, '.faceted', 'compositions', 'coding.yaml'))).toBe(false);
     expect(existsSync(join(homeDir, '.faceted', 'facets', 'persona', 'coder.md'))).toBe(false);
   });
 
@@ -94,6 +94,7 @@ describe('facet init/pull-sample integration flow', () => {
     expect(readFileSync(join(homeDir, '.faceted', 'facets', 'knowledge', 'architecture.md'), 'utf-8')).toBe(
       '# Pulled Architecture\n',
     );
+    expect(readFileSync(join(homeDir, '.faceted', 'compositions', 'coding.yaml'), 'utf-8')).toContain('name: coding');
   });
 
   it('should confirm before overwriting existing pull-sample targets', async () => {
