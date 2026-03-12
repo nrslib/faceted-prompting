@@ -44,10 +44,10 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
+          cache: npm
 
       - run: npm ci
-      - run: npm run build
-      - run: npm test
+      - run: npm run verify:release
 
       - name: Determine npm tag
         id: npm-tag
