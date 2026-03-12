@@ -82,8 +82,10 @@ function createSelectStub(expectedSelections: readonly string[]) {
 
 describe('facet skill integration flow', () => {
   const tempDirs: string[] = [];
+  const originalFetch = globalThis.fetch;
 
   afterEach(() => {
+    globalThis.fetch = originalFetch;
     for (const dir of tempDirs) {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -195,7 +197,7 @@ describe('facet skill integration flow', () => {
     expect(readFileSync(defaultSkillOutputPath, 'utf-8')).toContain('You are a coding agent.');
   });
 
-  it('should keep install skill UX on default initialization without template-apply prompts', async () => {
+  it('should keep install skill UX after pull-sample without template-apply prompts', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
@@ -204,6 +206,13 @@ describe('facet skill integration flow', () => {
     const { runFacetCli } = await loadCliModule();
     const seenPrompts: string[] = [];
     await runInit(runFacetCli, workspaceDir, homeDir);
+    globalThis.fetch = (async () => new Response('# Pulled Sample\n', { status: 200 })) as typeof fetch;
+    await runFacetCli(['pull-sample'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: async () => 'unused',
+      input: async (_prompt, defaultValue) => defaultValue,
+    });
 
     let selectCallCount = 0;
     const result = await runFacetCli(['install', 'skill'], {

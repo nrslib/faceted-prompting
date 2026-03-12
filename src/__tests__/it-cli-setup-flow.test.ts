@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -22,10 +22,12 @@ async function loadCliModule(): Promise<CliModule> {
   return import(modulePath) as Promise<CliModule>;
 }
 
-describe('facet init/setup integration flow', () => {
+describe('facet init/pull-sample integration flow', () => {
   const tempDirs: string[] = [];
+  const originalFetch = globalThis.fetch;
 
   afterEach(() => {
+    globalThis.fetch = originalFetch;
     for (const dir of tempDirs) {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -50,9 +52,51 @@ describe('facet init/setup integration flow', () => {
     });
     expect(existsSync(join(homeDir, '.faceted', 'config.yaml'))).toBe(true);
     expect(existsSync(join(homeDir, '.faceted', 'compositions', 'coding.yaml'))).toBe(true);
+    expect(existsSync(join(homeDir, '.faceted', 'facets', 'persona', 'coder.md'))).toBe(false);
   });
 
-  it('should set up faceted home via setup command without overwriting existing files', async () => {
+  it('should fetch TAKT sample facets via pull-sample command', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    const { runFacetCli } = await loadCliModule();
+    globalThis.fetch = (async (input: string | URL) => {
+      const url = input.toString();
+      const key = url.replace('https://raw.githubusercontent.com/nrslib/takt/main/builtins/ja/facets/', '');
+      const responses = new Map<string, string>([
+        ['personas/coder.md', '# Pulled Coder\n'],
+        ['knowledge/architecture.md', '# Pulled Architecture\n'],
+        ['knowledge/frontend.md', '# Pulled Frontend\n'],
+        ['knowledge/backend.md', '# Pulled Backend\n'],
+        ['policies/coding.md', '# Pulled Coding\n'],
+        ['policies/ai-antipattern.md', '# Pulled AI Antipattern\n'],
+      ]);
+      const body = responses.get(key);
+      if (!body) {
+        return new Response('', { status: 404 });
+      }
+      return new Response(body, { status: 200 });
+    }) as typeof fetch;
+
+    const result = await runFacetCli(['pull-sample'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: async () => 'unused',
+      input: async (_prompt, defaultValue) => defaultValue,
+    });
+
+    expect(result).toEqual({
+      kind: 'text',
+      text: `Pulled sample: ${join(homeDir, '.faceted')}`,
+    });
+    expect(readFileSync(join(homeDir, '.faceted', 'facets', 'persona', 'coder.md'), 'utf-8')).toBe('# Pulled Coder\n');
+    expect(readFileSync(join(homeDir, '.faceted', 'facets', 'knowledge', 'architecture.md'), 'utf-8')).toBe(
+      '# Pulled Architecture\n',
+    );
+  });
+
+  it('should confirm before overwriting existing pull-sample targets', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
@@ -66,20 +110,36 @@ describe('facet init/setup integration flow', () => {
     });
 
     const personaPath = join(homeDir, '.faceted', 'facets', 'persona', 'coder.md');
-    const original = readFileSync(personaPath, 'utf-8');
+    writeFileSync(personaPath, '# Existing Persona\n', 'utf-8');
 
-    const result = await runFacetCli(['setup'], {
+    globalThis.fetch = (async () => new Response('# Overwritten Persona\n', { status: 200 })) as typeof fetch;
+
+    await expect(runFacetCli(['pull-sample'], {
       cwd: workspaceDir,
       homeDir,
       select: async () => 'unused',
-      input: async (_prompt, defaultValue) => defaultValue,
+      input: async (prompt, defaultValue) => {
+        expect(prompt).toContain('[y/N]');
+        return defaultValue;
+      },
+    })).rejects.toThrow(`Pull sample was cancelled: ${personaPath}`);
+
+    const result = await runFacetCli(['pull-sample'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: async () => 'unused',
+      input: async (prompt, defaultValue) => {
+        if (prompt.startsWith('Pull sample will overwrite existing files.')) {
+          return 'y';
+        }
+        return defaultValue;
+      },
     });
 
     expect(result).toEqual({
       kind: 'text',
-      text: `Set up: ${join(homeDir, '.faceted')}`,
+      text: `Pulled sample: ${join(homeDir, '.faceted')}`,
     });
-    expect(readFileSync(personaPath, 'utf-8')).toBe(original);
-    expect(existsSync(join(homeDir, '.faceted', 'templates', 'issue-worktree', 'SKILL.md'))).toBe(true);
+    expect(readFileSync(personaPath, 'utf-8')).toBe('# Overwritten Persona\n');
   });
 });

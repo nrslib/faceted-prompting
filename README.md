@@ -35,7 +35,8 @@ Global CLI:
 
 ```bash
 npm install -g faceted-prompting
-facet compose
+facet init
+facet pull-sample
 ```
 
 ## Quick Start
@@ -62,6 +63,12 @@ const result = compose(
 ### As a CLI
 
 ```bash
+# Create local defaults under ~/.faceted
+facet init
+
+# Pull sample facets from TAKT on GitHub
+facet pull-sample
+
 # Compose prompts with auto-detected context
 facet compose
 
@@ -69,7 +76,7 @@ facet compose
 facet install skill
 ```
 
-First run initializes `~/.faceted/`:
+`facet init` creates `~/.faceted/` with config, directories, compositions, and templates:
 
 ```
 ~/.faceted/
@@ -86,8 +93,10 @@ First run initializes `~/.faceted/`:
 
 | Command | Description |
 |---------|-------------|
+| `facet init` | Create local config, facet directories, compositions, and templates |
+| `facet pull-sample` | Pull sample coding facets from TAKT on GitHub |
 | `facet compose` | Auto-detect context, compose prompts, and write to files |
-| `facet install skill` | Install a skill with facets to a target (Claude Code, Codex, template) |
+| `facet install skill` | Install a skill with facets to Claude Code or Codex |
 
 See the [CLI Reference](./docs/cli-reference.md) for details.
 

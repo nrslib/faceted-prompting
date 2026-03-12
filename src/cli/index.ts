@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { compose } from '../compose.js';
 import { readFacetedConfig } from '../config/index.js';
-import { initializeFacetedHome, setupFacetedHome } from '../init/index.js';
+import { initializeFacetedHome, listPullSampleTargetPaths, pullSampleFacets } from '../init/index.js';
 import { formatCombinedOutput, resolveOutputDirectory, writeComposeOutput } from '../output/index.js';
 import { resolveComposeContext } from './compose-context.js';
 import { buildFacetSet, ensureSafeDefinitionName } from './skill-renderer.js';
@@ -18,7 +18,7 @@ const USAGE = [
   '',
   'Commands:',
   '  init                 Initialize local faceted home',
-  '  setup                Set up faceted home with default resources',
+  '  pull-sample          Pull sample coding facets from TAKT on GitHub',
   '  compose              Compose facets into a prompt file',
   '  install skill        Install a skill from a composition',
 ].join('\n');
@@ -141,11 +141,25 @@ export async function runFacetCli(
     };
   }
 
-  if (command === 'setup') {
-    await setupFacetedHome({ homeDir: options.homeDir });
+  if (command === 'pull-sample') {
+    const overlappingPaths = listPullSampleTargetPaths(options.homeDir).filter(path => existsSync(path));
+    let overwrite = false;
+
+    if (overlappingPaths.length > 0) {
+      const overwriteAnswer = await options.input(
+        `Pull sample will overwrite existing files. Continue? (${overlappingPaths.join(', ')}) [y/N]`,
+        'n',
+      );
+      if (!shouldOverwrite(overwriteAnswer)) {
+        throw new Error(`Pull sample was cancelled: ${overlappingPaths.join(', ')}`);
+      }
+      overwrite = true;
+    }
+
+    await pullSampleFacets({ homeDir: options.homeDir, overwrite });
     return {
       kind: 'text',
-      text: `Set up: ${resolve(options.homeDir, '.faceted')}`,
+      text: `Pulled sample: ${resolve(options.homeDir, '.faceted')}`,
     };
   }
 

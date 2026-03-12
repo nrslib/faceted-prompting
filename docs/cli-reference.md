@@ -1,6 +1,6 @@
 # CLI Reference
 
-The `facet` CLI provides commands for composing prompts and installing skills from faceted definitions.
+The `facet` CLI provides commands for initializing facet data, composing prompts, and installing skills from faceted definitions.
 
 ## Installation
 
@@ -10,7 +10,7 @@ npm install -g faceted-prompting
 
 ## Initialization
 
-On first run, `facet` creates `~/.faceted/` with the following structure:
+`facet init` creates `~/.faceted/` with the following structure:
 
 ```
 ~/.faceted/
@@ -24,9 +24,27 @@ On first run, `facet` creates `~/.faceted/` with the following structure:
 └── repertoire/                  # Installed scope packages
 ```
 
-Sample facets (`coder`, `coding`, `ai-antipattern`, `architecture`) and a sample template (`issue-worktree`) are created during initialization.
+Compositions and the sample template (`issue-worktree`) are created during initialization. Actual sample facets are pulled separately.
 
 ## Commands
+
+### `facet init`
+
+Create local config, sample facets, compositions, and templates.
+
+```bash
+facet init
+```
+
+### `facet pull-sample`
+
+Fetch the sample coding facets from TAKT on GitHub and install them into `~/.faceted/`.
+
+```bash
+facet pull-sample
+```
+
+If any target files already exist, `pull-sample` asks for confirmation and overwrites them only when you answer `y` or `yes`.
 
 ### `facet compose`
 
@@ -59,16 +77,12 @@ facet install skill
 
 1. Scans `~/.faceted/compositions/` for available definitions
 2. Prompts to select a composition
-3. Detects available install targets:
+3. Prompts to select a target:
    - **Claude Code** — installs to `~/.claude/skills/{name}/SKILL.md`
    - **Codex** — installs to `~/.codex/skills/{name}/SKILL.md`
-   - **Template** — applies a multi-file template (if the definition has a `template` field)
-4. Prompts to select a target
-5. Copies facet files and generates the skill document
+4. Copies facet files and generates the skill document
 
-**Template-based install:**
-
-When a composition definition includes a `template` field, the install copies the template directory structure and injects facet tokens (`{{facet:persona}}`, `{{facet:knowledges}}`, `{{facet:policies}}`, `{{facet:instructions}}`).
+When a composition definition includes a `template` field, install still targets Claude Code or Codex, but it copies the template directory structure and injects facet tokens (`{{facet:persona}}`, `{{facet:knowledges}}`, `{{facet:policies}}`, `{{facet:instructions}}`).
 
 ## Compose Definition Format
 

@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { ensureConfigFile, getFacetedRoot } from '../config/index.js';
 
 const REQUIRED_FACET_DIRS = ['persona', 'knowledge', 'policies', 'output-contracts'] as const;
+const TAKT_BOOTSTRAP_BASE_URL = 'https://raw.githubusercontent.com/nrslib/takt/main/builtins/ja/facets';
 
 function makeComposition(name: string, description: string, knowledge: readonly string[]): string {
   const lines = [
@@ -51,30 +52,6 @@ const DEFAULT_COMPOSITIONS: ReadonlyArray<{ relativePath: string; content: strin
 ];
 
 const DEFAULT_TEMPLATES: ReadonlyArray<{ relativePath: string; content: string }> = [
-  {
-    relativePath: 'facets/persona/coder.md',
-    content: 'You are a helpful coding assistant.\n',
-  },
-  {
-    relativePath: 'facets/knowledge/architecture.md',
-    content: 'Add shared architecture context here.\n',
-  },
-  {
-    relativePath: 'facets/knowledge/frontend.md',
-    content: 'Add frontend-specific context here.\n',
-  },
-  {
-    relativePath: 'facets/knowledge/backend.md',
-    content: 'Add backend-specific context here.\n',
-  },
-  {
-    relativePath: 'facets/policies/coding.md',
-    content: 'Follow project coding standards.\n',
-  },
-  {
-    relativePath: 'facets/policies/ai-antipattern.md',
-    content: 'Avoid common AI antipatterns.\n',
-  },
   {
     relativePath: 'templates/issue-worktree/SKILL.md',
     content: [
@@ -140,6 +117,82 @@ const DEFAULT_TEMPLATES: ReadonlyArray<{ relativePath: string; content: string }
   ...DEFAULT_COMPOSITIONS,
 ];
 
+const BOOTSTRAP_TARGETS: ReadonlyArray<{
+  localRelativePath: string;
+  remoteRelativePath: string;
+}> = [
+  {
+    localRelativePath: 'facets/persona/coder.md',
+    remoteRelativePath: 'personas/coder.md',
+  },
+  {
+    localRelativePath: 'facets/knowledge/architecture.md',
+    remoteRelativePath: 'knowledge/architecture.md',
+  },
+  {
+    localRelativePath: 'facets/knowledge/frontend.md',
+    remoteRelativePath: 'knowledge/frontend.md',
+  },
+  {
+    localRelativePath: 'facets/knowledge/backend.md',
+    remoteRelativePath: 'knowledge/backend.md',
+  },
+  {
+    localRelativePath: 'facets/policies/coding.md',
+    remoteRelativePath: 'policies/coding.md',
+  },
+  {
+    localRelativePath: 'facets/policies/ai-antipattern.md',
+    remoteRelativePath: 'policies/ai-antipattern.md',
+  },
+];
+
+type FetchResponseLike = {
+  ok: boolean;
+  status: number;
+  text(): Promise<string>;
+};
+
+type FetchLike = (input: string) => Promise<FetchResponseLike>;
+
+function resolveFetchImpl(fetchImpl?: FetchLike): FetchLike {
+  if (fetchImpl) {
+    return fetchImpl;
+  }
+
+  if (typeof globalThis.fetch !== 'function') {
+    throw new Error('Global fetch is not available');
+  }
+
+  return globalThis.fetch.bind(globalThis) as FetchLike;
+}
+
+async function fetchBootstrapContent(remoteRelativePath: string, fetchImpl: FetchLike): Promise<string> {
+  const response = await fetchImpl(`${TAKT_BOOTSTRAP_BASE_URL}/${remoteRelativePath}`);
+  if (!response.ok) {
+    throw new Error(`Failed to fetch bootstrap facet: ${remoteRelativePath} (status: ${response.status})`);
+  }
+
+  return response.text();
+}
+
+export function listPullSampleTargetPaths(homeDir: string): string[] {
+  const facetedRoot = getFacetedRoot(homeDir);
+  return BOOTSTRAP_TARGETS.map(target => join(facetedRoot, target.localRelativePath));
+}
+
+async function bootstrapDefaultFacets(facetedRoot: string, fetchImpl: FetchLike, overwrite: boolean): Promise<void> {
+  for (const target of BOOTSTRAP_TARGETS) {
+    const targetPath = join(facetedRoot, target.localRelativePath);
+    if (existsSync(targetPath) && !overwrite) {
+      continue;
+    }
+    const content = await fetchBootstrapContent(target.remoteRelativePath, fetchImpl);
+    mkdirSync(dirname(targetPath), { recursive: true });
+    writeFileSync(targetPath, content, 'utf-8');
+  }
+}
+
 export async function initializeFacetedHome(options: { homeDir: string }): Promise<void> {
   const facetedRoot = getFacetedRoot(options.homeDir);
   ensureConfigFile(options.homeDir);
@@ -164,6 +217,8 @@ export async function initializeFacetedHome(options: { homeDir: string }): Promi
   }
 }
 
-export async function setupFacetedHome(options: { homeDir: string }): Promise<void> {
-  await initializeFacetedHome(options);
+export async function pullSampleFacets(options: { homeDir: string; fetchImpl?: FetchLike; overwrite?: boolean }): Promise<void> {
+  await initializeFacetedHome({ homeDir: options.homeDir });
+  const facetedRoot = getFacetedRoot(options.homeDir);
+  await bootstrapDefaultFacets(facetedRoot, resolveFetchImpl(options.fetchImpl), options.overwrite ?? false);
 }

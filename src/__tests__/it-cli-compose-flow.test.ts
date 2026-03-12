@@ -31,6 +31,19 @@ async function runInit(runFacetCli: CliModule['runFacetCli'], workspaceDir: stri
   });
 }
 
+function writeDefaultFacetFixture(homeDir: string, persona = 'You are a coding agent.\n'): void {
+  const facetsRoot = join(homeDir, '.faceted', 'facets');
+  mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'knowledge'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'policies'), { recursive: true });
+  writeFileSync(join(facetsRoot, 'persona', 'coder.md'), persona, 'utf-8');
+  writeFileSync(join(facetsRoot, 'knowledge', 'architecture.md'), 'Architecture reference.\n', 'utf-8');
+  writeFileSync(join(facetsRoot, 'knowledge', 'frontend.md'), 'Frontend reference.\n', 'utf-8');
+  writeFileSync(join(facetsRoot, 'knowledge', 'backend.md'), 'Backend reference.\n', 'utf-8');
+  writeFileSync(join(facetsRoot, 'policies', 'coding.md'), 'Never hide errors.\n', 'utf-8');
+  writeFileSync(join(facetsRoot, 'policies', 'ai-antipattern.md'), 'Do not add dead code.\n', 'utf-8');
+}
+
 describe('facet compose integration flow', () => {
   const tempDirs: string[] = [];
 
@@ -145,7 +158,7 @@ describe('facet compose integration flow', () => {
     })).rejects.toThrow(`Invalid faceted config file: ${configPath}`);
   });
 
-  it('should initialize faceted home on first run and write split output to cwd when input is blank', async () => {
+  it('should compose after init when required facets are prepared', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
@@ -163,6 +176,7 @@ describe('facet compose integration flow', () => {
       text: `Initialized: ${join(homeDir, '.faceted')}`,
     });
 
+    writeDefaultFacetFixture(homeDir, 'You are a prepared coding assistant.\n');
     writeFileSync(join(workspaceDir, 'server.ts'), 'export const server = true;\n', 'utf-8');
 
     const result = await runFacetCli(['compose'], {
@@ -187,7 +201,7 @@ describe('facet compose integration flow', () => {
 
     const generatedSystem = readFileSync(result.paths[0]!, 'utf-8');
     const generatedUser = readFileSync(result.paths[1]!, 'utf-8');
-    expect(generatedSystem).toContain('You are a helpful coding assistant.');
+    expect(generatedSystem).toContain('You are a prepared coding assistant.');
     expect(generatedUser).toContain('# Related Files');
     expect(generatedUser).toContain('server.ts');
   });
@@ -215,6 +229,7 @@ describe('facet compose integration flow', () => {
 
     const { runFacetCli } = await loadCliModule();
     await runInit(runFacetCli, workspaceDir, homeDir);
+    writeDefaultFacetFixture(homeDir);
     const result = await runFacetCli(['compose'], {
       cwd: workspaceDir,
       homeDir,
@@ -246,6 +261,7 @@ describe('facet compose integration flow', () => {
 
     const { runFacetCli } = await loadCliModule();
     await runInit(runFacetCli, workspaceDir, homeDir);
+    writeDefaultFacetFixture(homeDir);
     await expect(runFacetCli(['compose'], {
       cwd: workspaceDir,
       homeDir,
@@ -276,6 +292,7 @@ describe('facet compose integration flow', () => {
 
     const { runFacetCli } = await loadCliModule();
     await runInit(runFacetCli, workspaceDir, homeDir);
+    writeDefaultFacetFixture(homeDir);
     const result = await runFacetCli(['compose'], {
       cwd: workspaceDir,
       homeDir,
@@ -312,6 +329,7 @@ describe('facet compose integration flow', () => {
 
     const { runFacetCli } = await loadCliModule();
     await runInit(runFacetCli, workspaceDir, homeDir);
+    writeDefaultFacetFixture(homeDir);
     await expect(runFacetCli(['compose'], {
       cwd: workspaceDir,
       homeDir,
