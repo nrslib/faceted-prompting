@@ -2,7 +2,7 @@ import { existsSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { compose } from '../compose.js';
 import { readFacetedConfig } from '../config/index.js';
-import { initializeFacetedHome } from '../init/index.js';
+import { initializeFacetedHome, setupFacetedHome } from '../init/index.js';
 import { formatCombinedOutput, resolveOutputDirectory, writeComposeOutput } from '../output/index.js';
 import { resolveComposeContext } from './compose-context.js';
 import { buildFacetSet, ensureSafeDefinitionName } from './skill-renderer.js';
@@ -17,6 +17,8 @@ const USAGE = [
   'Usage: facet <command>',
   '',
   'Commands:',
+  '  init                 Initialize local faceted home',
+  '  setup                Set up faceted home with default resources',
   '  compose              Compose facets into a prompt file',
   '  install skill        Install a skill from a composition',
 ].join('\n');
@@ -131,7 +133,26 @@ export async function runFacetCli(
   const command = ensureCommand(args[0]);
   const subcommand = args[1];
 
-  await initializeFacetedHome({ homeDir: options.homeDir });
+  if (command === 'init') {
+    await initializeFacetedHome({ homeDir: options.homeDir });
+    return {
+      kind: 'text',
+      text: `Initialized: ${resolve(options.homeDir, '.faceted')}`,
+    };
+  }
+
+  if (command === 'setup') {
+    await setupFacetedHome({ homeDir: options.homeDir });
+    return {
+      kind: 'text',
+      text: `Set up: ${resolve(options.homeDir, '.faceted')}`,
+    };
+  }
+
+  if (command !== 'compose' && command !== 'install') {
+    throw new Error(`Unsupported command: ${command}`);
+  }
+
   await readFacetedConfig(options.homeDir);
 
   if (command === 'compose') {

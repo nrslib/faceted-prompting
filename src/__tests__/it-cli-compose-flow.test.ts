@@ -22,6 +22,15 @@ async function loadCliModule(): Promise<CliModule> {
   return import(modulePath) as Promise<CliModule>;
 }
 
+async function runInit(runFacetCli: CliModule['runFacetCli'], workspaceDir: string, homeDir: string): Promise<void> {
+  await runFacetCli(['init'], {
+    cwd: workspaceDir,
+    homeDir,
+    select: async () => 'unused',
+    input: async (_prompt, defaultValue) => defaultValue,
+  });
+}
+
 describe('facet compose integration flow', () => {
   const tempDirs: string[] = [];
 
@@ -141,9 +150,21 @@ describe('facet compose integration flow', () => {
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
 
+    const { runFacetCli } = await loadCliModule();
+    const initResult = await runFacetCli(['init'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: async () => 'unused',
+      input: async (_prompt, defaultValue) => defaultValue,
+    });
+
+    expect(initResult).toEqual({
+      kind: 'text',
+      text: `Initialized: ${join(homeDir, '.faceted')}`,
+    });
+
     writeFileSync(join(workspaceDir, 'server.ts'), 'export const server = true;\n', 'utf-8');
 
-    const { runFacetCli } = await loadCliModule();
     const result = await runFacetCli(['compose'], {
       cwd: workspaceDir,
       homeDir,
@@ -171,6 +192,20 @@ describe('facet compose integration flow', () => {
     expect(generatedUser).toContain('server.ts');
   });
 
+  it('should require init before compose', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli(['compose'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: async () => 'unused',
+      input: async (_prompt, defaultValue) => defaultValue,
+    })).rejects.toThrow(`Missing faceted config: ${join(homeDir, '.faceted', 'config.yaml')}`);
+  });
+
   it('should truncate related file content and keep source reference', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
@@ -179,6 +214,7 @@ describe('facet compose integration flow', () => {
     writeFileSync(join(workspaceDir, 'long.ts'), `${'x'.repeat(2500)}\n`, 'utf-8');
 
     const { runFacetCli } = await loadCliModule();
+    await runInit(runFacetCli, workspaceDir, homeDir);
     const result = await runFacetCli(['compose'], {
       cwd: workspaceDir,
       homeDir,
@@ -209,6 +245,7 @@ describe('facet compose integration flow', () => {
     writeFileSync(outputPath, 'existing content', 'utf-8');
 
     const { runFacetCli } = await loadCliModule();
+    await runInit(runFacetCli, workspaceDir, homeDir);
     await expect(runFacetCli(['compose'], {
       cwd: workspaceDir,
       homeDir,
@@ -238,6 +275,7 @@ describe('facet compose integration flow', () => {
     writeFileSync(outputPath, 'existing content', 'utf-8');
 
     const { runFacetCli } = await loadCliModule();
+    await runInit(runFacetCli, workspaceDir, homeDir);
     const result = await runFacetCli(['compose'], {
       cwd: workspaceDir,
       homeDir,
@@ -273,6 +311,7 @@ describe('facet compose integration flow', () => {
     symlinkSync(outsideTargetPath, join(outputDir, 'coding.md'));
 
     const { runFacetCli } = await loadCliModule();
+    await runInit(runFacetCli, workspaceDir, homeDir);
     await expect(runFacetCli(['compose'], {
       cwd: workspaceDir,
       homeDir,

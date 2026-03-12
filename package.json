@@ -21,9 +21,13 @@
   "scripts": {
     "build": "tsc",
     "watch": "tsc --watch",
-    "test": "vitest run",
+    "test": "npm run test:unit",
+    "test:unit": "vitest run --config vitest.config.ts",
     "test:watch": "vitest",
+    "test:e2e": "tmp=\"$(mktemp -t faceted-prompting-e2e.XXXXXX)\"; mkdir -p e2e/results; npm run test:e2e:cli >\"$tmp\" 2>&1; code=$?; cat \"$tmp\"; rm -f \"$tmp\"; if [ \"$code\" -eq 0 ]; then msg='test:e2e passed'; else msg=\"test:e2e failed (exit=$code)\"; fi; if command -v osascript >/dev/null 2>&1; then osascript -e \"display notification \\\"$msg\\\" with title \\\"faceted-prompting\\\" subtitle \\\"E2E\\\"\" >/dev/null 2>&1 || true; fi; echo \"[faceted-prompting] $msg\"; exit $code",
+    "test:e2e:cli": "vitest run --config vitest.config.e2e.ts --outputFile.json=e2e/results/cli.json",
     "lint": "eslint src/",
+    "check:release": "npm run build && npm run lint && npm run test:unit && npm run test:e2e; code=$?; if [ \"$code\" -eq 0 ]; then msg='check:release passed'; else msg=\"check:release failed (exit=$code)\"; fi; if command -v osascript >/dev/null 2>&1; then osascript -e \"display notification \\\"$msg\\\" with title \\\"faceted-prompting\\\" subtitle \\\"Release Check\\\"\" >/dev/null 2>&1 || true; fi; echo \"[faceted-prompting] $msg\"; exit $code",
     "prepublishOnly": "npm run build && npm run test"
   },
   "keywords": [

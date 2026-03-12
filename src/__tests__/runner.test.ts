@@ -54,6 +54,32 @@ describe('runner', () => {
     expect(exitCode).toBeUndefined();
   });
 
+  it('should print text output when runFacetCli returns text result', async () => {
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+    let exitCode: number | undefined;
+
+    await runMain(['init'], {
+      runFacetCli: async () => ({
+        kind: 'text',
+        text: 'Initialized: /tmp/home/.faceted',
+      }),
+      writeStdout: message => {
+        stdout.push(message);
+      },
+      writeStderr: message => {
+        stderr.push(message);
+      },
+      setExitCode: code => {
+        exitCode = code;
+      },
+    });
+
+    expect(stdout).toEqual(['Initialized: /tmp/home/.faceted\n']);
+    expect(stderr).toEqual([]);
+    expect(exitCode).toBeUndefined();
+  });
+
   it('should print failure message and set exit code when runFacetCli throws', async () => {
     const stdout: string[] = [];
     const stderr: string[] = [];

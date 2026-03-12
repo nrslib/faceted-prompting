@@ -163,3 +163,7 @@ export async function initializeFacetedHome(options: { homeDir: string }): Promi
     }
   }
 }
+
+export async function setupFacetedHome(options: { homeDir: string }): Promise<void> {
+  await initializeFacetedHome(options);
+}

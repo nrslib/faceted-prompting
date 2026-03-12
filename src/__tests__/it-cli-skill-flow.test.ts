@@ -26,6 +26,15 @@ async function loadCliModule(): Promise<CliModule> {
   return import(modulePath) as Promise<CliModule>;
 }
 
+async function runInit(runFacetCli: CliModule['runFacetCli'], workspaceDir: string, homeDir: string): Promise<void> {
+  await runFacetCli(['init'], {
+    cwd: workspaceDir,
+    homeDir,
+    select: async () => 'unused',
+    input: async (_prompt, defaultValue) => defaultValue,
+  });
+}
+
 function createFacetedFixture(homeDir: string): {
   compositionsRoot: string;
 } {
@@ -100,6 +109,20 @@ describe('facet skill integration flow', () => {
     expect(result).toEqual({ kind: 'path', path: skillOutputPath });
     expect(existsSync(skillOutputPath)).toBe(true);
     expect(readFileSync(skillOutputPath, 'utf-8')).toContain('You are a coding agent.');
+  });
+
+  it('should require init before install skill', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli(['install', 'skill'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: async () => 'unused',
+      input: async (_prompt, defaultValue) => defaultValue,
+    })).rejects.toThrow(`Missing faceted config: ${join(homeDir, '.faceted', 'config.yaml')}`);
   });
 
   it('should install skill to default Claude Code output path when default input is accepted', async () => {
@@ -180,6 +203,7 @@ describe('facet skill integration flow', () => {
     const defaultSkillOutputPath = join(homeDir, '.codex', 'skills', 'coding', 'SKILL.md');
     const { runFacetCli } = await loadCliModule();
     const seenPrompts: string[] = [];
+    await runInit(runFacetCli, workspaceDir, homeDir);
 
     let selectCallCount = 0;
     const result = await runFacetCli(['install', 'skill'], {
