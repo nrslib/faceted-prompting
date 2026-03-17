@@ -1,6 +1,6 @@
 import { existsSync, lstatSync, readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { ensurePathWithinHome } from '../path-guard.js';
+import { basename, dirname, resolve } from 'node:path';
+import { ensurePathWithinHome, isWithinRoot } from '../path-guard.js';
 import { hasYamlFrontmatter, renderSkillDocument, renderSkillFrontmatter } from '../skill-renderer.js';
 import { writeSkillFile } from '../skill-file-ops.js';
 import type { FacetCliOptions, FacetCliResult } from '../types.js';
@@ -8,15 +8,13 @@ import {
   applyFacetTokensToPath,
   buildInlineFacetTokenValues,
   copyFacetFiles,
-  parseScanDepth,
 } from './facets.js';
 import {
   copyDirectoryTree,
   defaultOutputPath,
-  ensureDirectoryExists,
   ensureRegenerationTargetDir,
   listInstallTargets,
-  ensureTemplateDirectory,
+  ensureTemplateDirectoryFromRoots,
   resolveInstallTarget,
 } from './flow.js';
 import type { SkillSections } from './facets.js';
@@ -42,63 +40,11 @@ function ensureTemplateBackedSkillFrontmatter(params: {
   writeSkillFile(params.outputPath, contentWithFrontmatter, params.homeDir);
 }
 
-export async function runTemplateApplyInstall(params: {
-  options: FacetCliOptions;
-  safeSkillName: string;
-  sections: SkillSections;
-  templateDir: string;
-  definitionDir: string;
-  facetsRoot: string;
-}): Promise<FacetCliResult> {
-  const requestedDir = await params.options.input('Output directory', params.options.cwd);
-  const targetDir = resolve(requestedDir);
-  ensureDirectoryExists(targetDir, 'Output directory');
-
-  const scanDepth = parseScanDepth(await params.options.input('Scan depth', '1'));
-  const payload = composePromptPayload({
-    definition: params.sections.definition,
-    definitionDir: params.definitionDir,
-    facetsRoot: params.facetsRoot,
-    composeOptions: { contextMaxChars: 8000 },
-  });
-
-  copyDirectoryTree(params.templateDir, targetDir);
-
-  const facetsDir = join(targetDir, 'facets');
-  await ensureRegenerationTargetDir({
-    targetDir: facetsDir,
-    options: params.options,
-    promptLabel: 'Facets directory',
-  });
-
-  copyFacetFiles({
-    targetDir,
-    safeSkillName: params.safeSkillName,
-    copyFiles: payload.copyFiles,
-    literalInstructionBody:
-      params.sections.instruction && !('path' in params.sections.instruction)
-        ? params.sections.instruction.body
-        : undefined,
-  });
-
-  applyFacetTokensToPath({
-    rootDir: targetDir,
-    maxDepth: scanDepth,
-    tokenValues: buildInlineFacetTokenValues(params.sections),
-    excludeDirs: ['facets'],
-  });
-
-  return {
-    kind: 'path',
-    path: targetDir,
-  };
-}
-
 export async function runSkillDeployInstall(params: {
   options: FacetCliOptions;
-  facetedRoot: string;
+  facetedRoots: readonly string[];
   definitionDir: string;
-  facetsRoot: string;
+  facetsRoots: readonly string[];
   safeSkillName: string;
   definition: ComposeDefinition;
   sections: SkillSections;
@@ -116,21 +62,31 @@ export async function runSkillDeployInstall(params: {
     params.options.homeDir,
     'Skill output path',
   );
+  const targetRootDir = resolve(params.options.homeDir, ...target.relativeOutputPath);
+  if (!isWithinRoot(boundedOutputPath, targetRootDir)) {
+    throw new Error(`Skill output path must be inside target directory: ${targetRootDir}`);
+  }
+  if (basename(boundedOutputPath) !== 'SKILL.md') {
+    throw new Error(`Skill output path must point to SKILL.md: ${boundedOutputPath}`);
+  }
 
   if (existsSync(boundedOutputPath) && lstatSync(boundedOutputPath).isSymbolicLink()) {
     throw new Error(`Symbolic links are not allowed for skill output file: ${boundedOutputPath}`);
   }
 
   const templateDir = params.definition.template
-    ? ensureTemplateDirectory(params.facetedRoot, params.definition.template)
+    ? ensureTemplateDirectoryFromRoots(params.facetedRoots, params.definition.template)
     : undefined;
   const payload = composePromptPayload({
     definition: params.definition,
     definitionDir: params.definitionDir,
-    facetsRoot: params.facetsRoot,
+    facetsRoots: params.facetsRoots,
     composeOptions: { contextMaxChars: 8000 },
   });
   const targetDir = dirname(boundedOutputPath);
+  if (resolve(targetDir) === targetRootDir) {
+    throw new Error(`Skill output path must include a skill directory under target directory: ${targetRootDir}`);
+  }
 
   await ensureRegenerationTargetDir({
     targetDir,

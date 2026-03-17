@@ -5,7 +5,8 @@ import { buildFacetSet, resolveDefinitionSections } from './cli/skill-renderer.j
 function buildCopyFiles(params: {
   definition: ComposeDefinition;
   definitionDir: string;
-  facetsRoot: string;
+  facetsRoot?: string;
+  facetsRoots?: readonly string[];
 }): CopyFiles {
   const resolved = resolveDefinitionSections(params);
 
@@ -21,7 +22,8 @@ function buildCopyFiles(params: {
 export function composePromptPayload(params: {
   definition: ComposeDefinition;
   definitionDir: string;
-  facetsRoot: string;
+  facetsRoot?: string;
+  facetsRoots?: readonly string[];
   composeOptions: ComposeOptions;
 }): ComposedPromptPayload {
   const facetSet = buildFacetSet(params);

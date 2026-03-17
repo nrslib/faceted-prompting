@@ -6,7 +6,7 @@ import {
   readdirSync,
   rmSync,
 } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import {
   ensurePathAncestorsAndRealPathWithinHome,
   ensurePathAncestorsContainNoSymbolicLinks,
@@ -20,19 +20,33 @@ export function shouldOverwrite(answer: string): boolean {
   return normalized === 'y' || normalized === 'yes';
 }
 
-export function ensureTemplateDirectory(facetedRoot: string, templateName: string): string {
-  const templatesRoot = join(facetedRoot, 'templates');
-  const templatePath = ensurePathWithinRoots(
-    join(templatesRoot, templateName),
-    [templatesRoot],
-    `template "${templateName}"`,
-  );
-
-  if (!lstatSync(templatePath).isDirectory()) {
-    throw new Error(`Template path must be a directory: ${templatePath}`);
+export function ensureTemplateDirectoryFromRoots(
+  facetedRoots: readonly string[],
+  templateName: string,
+): string {
+  const templatesRoots = facetedRoots.map(facetedRoot => join(facetedRoot, 'templates'));
+  const primaryTemplatesRoot = templatesRoots[0];
+  if (!primaryTemplatesRoot) {
+    throw new Error('Template roots are required');
   }
 
-  return templatePath;
+  for (const templatesRoot of templatesRoots) {
+    const candidatePath = join(templatesRoot, templateName);
+    if (!existsSync(candidatePath)) {
+      continue;
+    }
+    const templatePath = ensurePathWithinRoots(
+      candidatePath,
+      [templatesRoot],
+      `template "${templateName}"`,
+    );
+    if (!lstatSync(templatePath).isDirectory()) {
+      throw new Error(`Template path must be a directory: ${templatePath}`);
+    }
+    return templatePath;
+  }
+
+  throw new Error(`Template directory does not exist: ${join(primaryTemplatesRoot, templateName)}`);
 }
 
 export function copyDirectoryTree(sourceDir: string, targetDir: string): void {
@@ -78,6 +92,9 @@ export async function ensureRegenerationTargetDir(params: {
   homeDir?: string;
 }): Promise<void> {
   const { targetDir, options, promptLabel } = params;
+  if (params.homeDir && resolve(targetDir) === resolve(params.homeDir)) {
+    throw new Error(`${promptLabel} must not be home directory: ${resolve(targetDir)}`);
+  }
   ensurePathSafety({
     targetDir,
     promptLabel,
@@ -94,10 +111,4 @@ export async function ensureRegenerationTargetDir(params: {
   }
 
   mkdirSync(targetDir, { recursive: true });
-}
-
-export function ensureDirectoryExists(path: string, label: string): void {
-  if (!existsSync(path) || !lstatSync(path).isDirectory()) {
-    throw new Error(`${label} does not exist: ${path}`);
-  }
 }
