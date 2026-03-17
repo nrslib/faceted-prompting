@@ -13,4 +13,15 @@ describe('module boundary', () => {
     expect('loadComposeDefinition' in resolveModule).toBe(false);
     expect(typeof composeDefinitionModule.loadComposeDefinition).toBe('function');
   });
+
+  it('should not export unused install helpers', async () => {
+    const flowModulePath = pathToFileURL(resolve('src/cli/install-skill/flow.ts')).href;
+    const modesModulePath = pathToFileURL(resolve('src/cli/install-skill/modes.ts')).href;
+    const flowModule = await import(flowModulePath);
+    const modesModule = await import(modesModulePath);
+
+    expect('ensureTemplateDirectory' in flowModule).toBe(false);
+    expect('ensureDirectoryExists' in flowModule).toBe(false);
+    expect('runTemplateApplyInstall' in modesModule).toBe(false);
+  });
 });

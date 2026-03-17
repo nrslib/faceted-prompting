@@ -1,8 +1,12 @@
 import { existsSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { compose } from '../compose.js';
-import { readFacetedConfig } from '../config/index.js';
-import { initializeFacetedHome, listPullSampleTargetPaths, pullSampleFacets } from '../init/index.js';
+import {
+  initializeGlobalFaceted,
+  initializeLocalFaceted,
+  listPullSampleTargetPaths,
+  pullSampleFacets,
+} from '../init/index.js';
 import { formatCombinedOutput, resolveOutputDirectory, writeComposeOutput } from '../output/index.js';
 import { resolveComposeContext } from './compose-context.js';
 import { buildFacetSet, ensureSafeDefinitionName } from './skill-renderer.js';
@@ -17,7 +21,8 @@ const USAGE = [
   'Usage: facet <command>',
   '',
   'Commands:',
-  '  init                 Initialize local faceted home',
+  '  init                 Initialize local faceted home (.faceted under cwd)',
+  '  init global          Initialize global faceted home (~/.faceted) and pull sample facets',
   '  pull-sample          Pull sample coding facets from TAKT on GitHub',
   '  compose              Compose facets into a prompt file',
   '  install skill        Install a skill from a composition',
@@ -37,7 +42,7 @@ function ensureSkillSubcommand(command: string, subcommand: string | undefined):
 }
 
 async function runComposeCommand(options: FacetCliOptions): Promise<FacetCliResult> {
-  const { facetsRoot, compositionsDir } = getSkillPaths(options.homeDir);
+  const { facetsRoots, facetedRoots } = getSkillPaths(options.cwd, options.homeDir);
   const composeContext = resolveComposeContext(options.cwd);
   const definition = {
     name: composeContext.name,
@@ -47,11 +52,14 @@ async function runComposeCommand(options: FacetCliOptions): Promise<FacetCliResu
     instruction: composeContext.relatedInstruction,
     order: ['policies', 'knowledge', 'instruction'] as const,
   };
-  const definitionDir = dirname(compositionsDir);
+  const definitionDir = facetedRoots[0];
+  if (!definitionDir) {
+    throw new Error('Faceted root is required');
+  }
 
   const facetSet = buildFacetSet({
     definitionDir,
-    facetsRoot,
+    facetsRoots,
     definition,
   });
 
@@ -134,11 +142,23 @@ export async function runFacetCli(
   const subcommand = args[1];
 
   if (command === 'init') {
-    await initializeFacetedHome({ homeDir: options.homeDir });
-    return {
-      kind: 'text',
-      text: `Initialized: ${resolve(options.homeDir, '.faceted')}`,
-    };
+    if (subcommand === undefined) {
+      await initializeLocalFaceted({ cwd: options.cwd });
+      return {
+        kind: 'text',
+        text: `Initialized: ${resolve(options.cwd, '.faceted')}`,
+      };
+    }
+
+    if (subcommand === 'global') {
+      await initializeGlobalFaceted({ homeDir: options.homeDir });
+      return {
+        kind: 'text',
+        text: `Initialized global with sample facets: ${resolve(options.homeDir, '.faceted')}`,
+      };
+    }
+
+    throw new Error(`Unsupported command: ${command} ${subcommand}`);
   }
 
   if (command === 'pull-sample') {
@@ -166,8 +186,6 @@ export async function runFacetCli(
   if (command !== 'compose' && command !== 'install') {
     throw new Error(`Unsupported command: ${command}`);
   }
-
-  await readFacetedConfig(options.homeDir);
 
   if (command === 'compose') {
     return runComposeCommand(options);

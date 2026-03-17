@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -32,6 +33,8 @@ async function runInit(runFacetCli: CliModule['runFacetCli'], workspaceDir: stri
 }
 
 function writeDefaultFacetFixture(homeDir: string, persona = 'You are a coding agent.\n'): void {
+  mkdirSync(join(homeDir, '.faceted'), { recursive: true });
+  writeFileSync(join(homeDir, '.faceted', 'config.yaml'), 'version: 1\n', 'utf-8');
   const facetsRoot = join(homeDir, '.faceted', 'facets');
   mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
   mkdirSync(join(facetsRoot, 'knowledge'), { recursive: true });
@@ -42,6 +45,30 @@ function writeDefaultFacetFixture(homeDir: string, persona = 'You are a coding a
   writeFileSync(join(facetsRoot, 'knowledge', 'backend.md'), 'Backend reference.\n', 'utf-8');
   writeFileSync(join(facetsRoot, 'policies', 'coding.md'), 'Never hide errors.\n', 'utf-8');
   writeFileSync(join(facetsRoot, 'policies', 'ai-antipattern.md'), 'Do not add dead code.\n', 'utf-8');
+}
+
+function writeFacetFilesUnderFacetedRoot(
+  facetedRoot: string,
+  contents: {
+    persona: string;
+    codingPolicy: string;
+    aiAntipatternPolicy: string;
+    architecture: string;
+    frontend: string;
+    backend: string;
+  },
+): void {
+  const facetsRoot = join(facetedRoot, 'facets');
+  mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'knowledge'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'policies'), { recursive: true });
+  writeFileSync(join(facetedRoot, 'config.yaml'), 'version: 1\n', 'utf-8');
+  writeFileSync(join(facetsRoot, 'persona', 'coder.md'), contents.persona, 'utf-8');
+  writeFileSync(join(facetsRoot, 'knowledge', 'architecture.md'), contents.architecture, 'utf-8');
+  writeFileSync(join(facetsRoot, 'knowledge', 'frontend.md'), contents.frontend, 'utf-8');
+  writeFileSync(join(facetsRoot, 'knowledge', 'backend.md'), contents.backend, 'utf-8');
+  writeFileSync(join(facetsRoot, 'policies', 'coding.md'), contents.codingPolicy, 'utf-8');
+  writeFileSync(join(facetsRoot, 'policies', 'ai-antipattern.md'), contents.aiAntipatternPolicy, 'utf-8');
 }
 
 describe('facet compose integration flow', () => {
@@ -111,6 +138,81 @@ describe('facet compose integration flow', () => {
     expect(generated).toContain('Source: src/App.tsx');
   });
 
+  it('should prefer local facets and fallback to global facets when local facets are missing', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeFileSync(join(workspaceDir, 'server.ts'), 'export const server = true;\n', 'utf-8');
+    writeFacetFilesUnderFacetedRoot(join(homeDir, '.faceted'), {
+      persona: 'You are a global coder persona.\n',
+      codingPolicy: 'Global coding policy.\n',
+      aiAntipatternPolicy: 'Global AI antipattern policy.\n',
+      architecture: 'Global architecture knowledge.\n',
+      frontend: 'Global frontend knowledge.\n',
+      backend: 'Global backend knowledge.\n',
+    });
+
+    const localFacetedRoot = join(workspaceDir, '.faceted');
+    mkdirSync(join(localFacetedRoot, 'facets', 'persona'), { recursive: true });
+    mkdirSync(join(localFacetedRoot, 'facets', 'policies'), { recursive: true });
+    writeFileSync(join(localFacetedRoot, 'facets', 'persona', 'coder.md'), 'You are a local coder persona.\n', 'utf-8');
+    writeFileSync(join(localFacetedRoot, 'facets', 'policies', 'coding.md'), 'Local coding policy.\n', 'utf-8');
+
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli(['compose'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: async () => 'Combined (single file)',
+      input: async (_prompt, defaultValue) => defaultValue,
+    });
+
+    expect(result.kind).toBe('path');
+    if (result.kind !== 'path') {
+      throw new Error('Expected path result for compose command');
+    }
+
+    const generated = readFileSync(result.path, 'utf-8');
+    expect(generated).toContain('You are a local coder persona.');
+    expect(generated).toContain('Local coding policy.');
+    expect(generated).toContain('Global AI antipattern policy.');
+    expect(generated).toContain('Global architecture knowledge.');
+  });
+
+  it('should compose with local facets when global faceted home is not initialized', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeFileSync(join(workspaceDir, 'api.ts'), 'export const api = true;\n', 'utf-8');
+    writeFacetFilesUnderFacetedRoot(join(workspaceDir, '.faceted'), {
+      persona: 'You are a local-only coder persona.\n',
+      codingPolicy: 'Local-only coding policy.\n',
+      aiAntipatternPolicy: 'Local-only AI antipattern policy.\n',
+      architecture: 'Local-only architecture knowledge.\n',
+      frontend: 'Local-only frontend knowledge.\n',
+      backend: 'Local-only backend knowledge.\n',
+    });
+
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli(['compose'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: async () => 'Combined (single file)',
+      input: async (_prompt, defaultValue) => defaultValue,
+    });
+
+    expect(result.kind).toBe('path');
+    if (result.kind !== 'path') {
+      throw new Error('Expected path result for compose command');
+    }
+
+    const generated = readFileSync(result.path, 'utf-8');
+    expect(generated).toContain('You are a local-only coder persona.');
+    expect(generated).toContain('Local-only coding policy.');
+    expect(generated).toContain('Local-only architecture knowledge.');
+  });
+
   it('should reject unsupported commands', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
@@ -139,23 +241,39 @@ describe('facet compose integration flow', () => {
     })).rejects.toThrow('Usage: facet <command>');
   });
 
-  it('should fail compose command when config file is malformed', async () => {
+  it('should compose with local facets even when global config file is malformed', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
 
-    const facetedRoot = join(homeDir, '.faceted');
-    mkdirSync(facetedRoot, { recursive: true });
-    const configPath = join(facetedRoot, 'config.yaml');
-    writeFileSync(configPath, 'version: [1\n', 'utf-8');
+    const globalFacetedRoot = join(homeDir, '.faceted');
+    mkdirSync(globalFacetedRoot, { recursive: true });
+    writeFileSync(join(globalFacetedRoot, 'config.yaml'), 'version: [1\n', 'utf-8');
+    writeFileSync(join(workspaceDir, 'service.ts'), 'export const service = true;\n', 'utf-8');
+    writeFacetFilesUnderFacetedRoot(join(workspaceDir, '.faceted'), {
+      persona: 'You are a local malformed-config fallback persona.\n',
+      codingPolicy: 'Local malformed-config coding policy.\n',
+      aiAntipatternPolicy: 'Local malformed-config AI policy.\n',
+      architecture: 'Local malformed-config architecture knowledge.\n',
+      frontend: 'Local malformed-config frontend knowledge.\n',
+      backend: 'Local malformed-config backend knowledge.\n',
+    });
 
     const { runFacetCli } = await loadCliModule();
-    await expect(runFacetCli(['compose'], {
+    const result = await runFacetCli(['compose'], {
       cwd: workspaceDir,
       homeDir,
-      select: async () => 'unused',
+      select: async () => 'Combined (single file)',
       input: async (_prompt, defaultValue) => defaultValue,
-    })).rejects.toThrow(`Invalid faceted config file: ${configPath}`);
+    });
+
+    expect(result.kind).toBe('path');
+    if (result.kind !== 'path') {
+      throw new Error('Expected path result for compose command');
+    }
+    const generated = readFileSync(result.path, 'utf-8');
+    expect(generated).toContain('You are a local malformed-config fallback persona.');
+    expect(generated).toContain('Local malformed-config coding policy.');
   });
 
   it('should compose after init when required facets are prepared', async () => {
@@ -173,7 +291,7 @@ describe('facet compose integration flow', () => {
 
     expect(initResult).toEqual({
       kind: 'text',
-      text: `Initialized: ${join(homeDir, '.faceted')}`,
+      text: `Initialized: ${join(workspaceDir, '.faceted')}`,
     });
 
     writeDefaultFacetFixture(homeDir, 'You are a prepared coding assistant.\n');
@@ -217,7 +335,7 @@ describe('facet compose integration flow', () => {
       homeDir,
       select: async () => 'unused',
       input: async (_prompt, defaultValue) => defaultValue,
-    })).rejects.toThrow(`Missing faceted config: ${join(homeDir, '.faceted', 'config.yaml')}`);
+    })).rejects.toThrow('Missing persona facet "coder"');
   });
 
   it('should truncate related file content and keep source reference', async () => {
@@ -245,6 +363,41 @@ describe('facet compose integration flow', () => {
     const generated = readFileSync(result.path, 'utf-8');
     expect(generated).toContain('...TRUNCATED...');
     expect(generated).toContain('Source: long.ts');
+  });
+
+  it('should include only cwd-scoped git files in related files when composing from a subdirectory', async () => {
+    const repositoryDir = mkdtempSync(join(tmpdir(), 'facet-repo-'));
+    const workspaceDir = join(repositoryDir, 'workspace');
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(repositoryDir, homeDir);
+    mkdirSync(workspaceDir, { recursive: true });
+
+    execFileSync('git', ['init'], { cwd: repositoryDir, stdio: 'pipe' });
+
+    const { runFacetCli } = await loadCliModule();
+    await runInit(runFacetCli, workspaceDir, homeDir);
+    writeDefaultFacetFixture(homeDir);
+    execFileSync('git', ['add', '.'], { cwd: repositoryDir, stdio: 'pipe' });
+
+    mkdirSync(join(workspaceDir, 'src'), { recursive: true });
+    writeFileSync(join(workspaceDir, 'src', 'App.tsx'), 'export const App = () => <div>ok</div>;\n', 'utf-8');
+    writeFileSync(join(repositoryDir, 'outside.ts'), 'export const outside = true;\n', 'utf-8');
+
+    const result = await runFacetCli(['compose'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: async () => 'Combined (single file)',
+      input: async (_prompt, defaultValue) => defaultValue,
+    });
+
+    expect(result.kind).toBe('path');
+    if (result.kind !== 'path') {
+      throw new Error('Expected path result for compose command');
+    }
+
+    const generated = readFileSync(result.path, 'utf-8');
+    expect(generated).toContain('Source: src/App.tsx');
+    expect(generated).not.toContain('outside.ts');
   });
 
   it('should cancel overwrite when output file exists and answer is not y/yes', async () => {

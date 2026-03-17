@@ -184,6 +184,24 @@ export function listPullSampleTargetPaths(homeDir: string): string[] {
   ];
 }
 
+function initializeFacetedDir(baseDir: string): string {
+  const facetedRoot = getFacetedRoot(baseDir);
+  ensureConfigFile(baseDir);
+
+  const facetsRoot = join(facetedRoot, 'facets');
+  const compositionsRoot = join(facetedRoot, 'compositions');
+  const templatesRoot = join(facetedRoot, 'templates');
+  mkdirSync(facetsRoot, { recursive: true });
+  mkdirSync(compositionsRoot, { recursive: true });
+  mkdirSync(templatesRoot, { recursive: true });
+
+  for (const dirName of REQUIRED_FACET_DIRS) {
+    mkdirSync(join(facetsRoot, dirName), { recursive: true });
+  }
+
+  return facetedRoot;
+}
+
 async function bootstrapDefaultFacets(facetedRoot: string, fetchImpl: FetchLike, overwrite: boolean): Promise<void> {
   for (const target of BOOTSTRAP_TARGETS) {
     const targetPath = join(facetedRoot, target.localRelativePath);
@@ -208,25 +226,19 @@ function writeDefaultSampleFiles(facetedRoot: string, overwrite: boolean): void 
   }
 }
 
-export async function initializeFacetedHome(options: { homeDir: string }): Promise<void> {
-  const facetedRoot = getFacetedRoot(options.homeDir);
-  ensureConfigFile(options.homeDir);
+export async function initializeLocalFaceted(options: { cwd: string }): Promise<void> {
+  initializeFacetedDir(options.cwd);
+}
 
-  const facetsRoot = join(facetedRoot, 'facets');
-  const compositionsRoot = join(facetedRoot, 'compositions');
-  const templatesRoot = join(facetedRoot, 'templates');
-  mkdirSync(facetsRoot, { recursive: true });
-  mkdirSync(compositionsRoot, { recursive: true });
-  mkdirSync(templatesRoot, { recursive: true });
-
-  for (const dirName of REQUIRED_FACET_DIRS) {
-    mkdirSync(join(facetsRoot, dirName), { recursive: true });
-  }
+export async function initializeGlobalFaceted(options: { homeDir: string; fetchImpl?: FetchLike }): Promise<void> {
+  await pullSampleFacets({
+    homeDir: options.homeDir,
+    fetchImpl: options.fetchImpl,
+  });
 }
 
 export async function pullSampleFacets(options: { homeDir: string; fetchImpl?: FetchLike; overwrite?: boolean }): Promise<void> {
-  await initializeFacetedHome({ homeDir: options.homeDir });
-  const facetedRoot = getFacetedRoot(options.homeDir);
+  const facetedRoot = initializeFacetedDir(options.homeDir);
   const overwrite = options.overwrite ?? false;
   writeDefaultSampleFiles(facetedRoot, overwrite);
   await bootstrapDefaultFacets(facetedRoot, resolveFetchImpl(options.fetchImpl), overwrite);

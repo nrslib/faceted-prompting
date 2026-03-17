@@ -112,9 +112,9 @@ function detectGitRelatedFiles(cwd: string): string[] {
 
   const collected = new Set<string>();
   const commands: string[][] = [
-    ['diff', '--name-only', '--diff-filter=ACMR'],
-    ['diff', '--name-only', '--cached', '--diff-filter=ACMR'],
-    ['ls-files', '--others', '--exclude-standard'],
+    ['diff', '--name-only', '--diff-filter=ACMR', '--', '.'],
+    ['diff', '--name-only', '--cached', '--diff-filter=ACMR', '--', '.'],
+    ['ls-files', '--others', '--exclude-standard', '--', '.'],
   ];
 
   for (const args of commands) {

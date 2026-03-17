@@ -33,7 +33,7 @@ describe('facet init/pull-sample integration flow', () => {
     }
   });
 
-  it('should initialize faceted home via init command', async () => {
+  it('should initialize local faceted directory via init command', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
@@ -48,11 +48,54 @@ describe('facet init/pull-sample integration flow', () => {
 
     expect(result).toEqual({
       kind: 'text',
-      text: `Initialized: ${join(homeDir, '.faceted')}`,
+      text: `Initialized: ${join(workspaceDir, '.faceted')}`,
     });
-    expect(existsSync(join(homeDir, '.faceted', 'config.yaml'))).toBe(true);
-    expect(existsSync(join(homeDir, '.faceted', 'compositions', 'coding.yaml'))).toBe(false);
-    expect(existsSync(join(homeDir, '.faceted', 'facets', 'persona', 'coder.md'))).toBe(false);
+    expect(existsSync(join(workspaceDir, '.faceted', 'config.yaml'))).toBe(true);
+    expect(existsSync(join(homeDir, '.faceted', 'config.yaml'))).toBe(false);
+    expect(existsSync(join(workspaceDir, '.faceted', 'compositions', 'coding.yaml'))).toBe(false);
+    expect(existsSync(join(workspaceDir, '.faceted', 'facets', 'persona', 'coder.md'))).toBe(false);
+  });
+
+  it('should initialize global faceted home and pull sample facets via init global command', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    const { runFacetCli } = await loadCliModule();
+    globalThis.fetch = (async (input: string | URL) => {
+      const url = input.toString();
+      const key = url.replace('https://raw.githubusercontent.com/nrslib/takt/main/builtins/ja/facets/', '');
+      const responses = new Map<string, string>([
+        ['personas/coder.md', '# Pulled Coder\n'],
+        ['knowledge/architecture.md', '# Pulled Architecture\n'],
+        ['knowledge/frontend.md', '# Pulled Frontend\n'],
+        ['knowledge/backend.md', '# Pulled Backend\n'],
+        ['policies/coding.md', '# Pulled Coding\n'],
+        ['policies/ai-antipattern.md', '# Pulled AI Antipattern\n'],
+      ]);
+      const body = responses.get(key);
+      if (!body) {
+        return new Response('', { status: 404 });
+      }
+      return new Response(body, { status: 200 });
+    }) as typeof fetch;
+
+    const result = await runFacetCli(['init', 'global'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: async () => 'unused',
+      input: async (_prompt, defaultValue) => defaultValue,
+    });
+
+    expect(result.kind).toBe('text');
+    if (result.kind !== 'text') {
+      throw new Error('Expected text result for init global');
+    }
+    expect(result.text).toContain(join(homeDir, '.faceted'));
+    expect(result.text.toLowerCase()).toContain('sample');
+    expect(existsSync(join(homeDir, '.faceted', 'compositions', 'coding.yaml'))).toBe(true);
+    expect(readFileSync(join(homeDir, '.faceted', 'facets', 'persona', 'coder.md'), 'utf-8')).toBe('# Pulled Coder\n');
+    expect(readFileSync(join(homeDir, '.faceted', 'compositions', 'coding.yaml'), 'utf-8')).toContain('name: coding');
   });
 
   it('should fetch TAKT sample facets via pull-sample command', async () => {
@@ -103,7 +146,7 @@ describe('facet init/pull-sample integration flow', () => {
     tempDirs.push(workspaceDir, homeDir);
 
     const { runFacetCli } = await loadCliModule();
-    await runFacetCli(['init'], {
+    await runFacetCli(['init', 'global'], {
       cwd: workspaceDir,
       homeDir,
       select: async () => 'unused',
@@ -142,5 +185,19 @@ describe('facet init/pull-sample integration flow', () => {
       text: `Pulled sample: ${join(homeDir, '.faceted')}`,
     });
     expect(readFileSync(personaPath, 'utf-8')).toBe('# Overwritten Persona\n');
+  });
+
+  it('should reject unknown init subcommand', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli(['init', 'unknown'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: async () => 'unused',
+      input: async (_prompt, defaultValue) => defaultValue,
+    })).rejects.toThrow('Unsupported command: init unknown');
   });
 });

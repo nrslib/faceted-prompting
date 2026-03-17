@@ -125,7 +125,7 @@ describe('facet install template-backed skill integration flow', () => {
     const result = await runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['templated', 'Codex']),
+      select: createSelectStub(['templated (global)', 'Codex']),
       input: async (_prompt, defaultValue) => defaultValue,
     });
 
@@ -155,7 +155,7 @@ describe('facet install template-backed skill integration flow', () => {
     await expect(runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['templated', 'Codex']),
+      select: createSelectStub(['templated (global)', 'Codex']),
       input: async (prompt, defaultValue) => {
         if (prompt.toLowerCase().includes('replace') || prompt.toLowerCase().includes('overwrite')) {
           return 'n';
@@ -181,9 +181,27 @@ describe('facet install template-backed skill integration flow', () => {
     await expect(runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['templated', 'Codex']),
+      select: createSelectStub(['templated (global)', 'Codex']),
       input: async (_prompt, defaultValue) => defaultValue,
     })).rejects.toThrow(`Symbolic links are not allowed in Target directory path: ${codexLinkDir}`);
+  });
+
+  it('should reject template-backed install when output path is outside selected target directory', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    createFacetedFixture(homeDir);
+
+    const disallowedOutputPath = join(homeDir, 'SKILL.md');
+    const { runFacetCli } = await loadCliModule();
+
+    await expect(runFacetCli(['install', 'skill'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['templated (global)', 'Codex']),
+      input: async (prompt, defaultValue) =>
+        prompt.toLowerCase().includes('output') ? disallowedOutputPath : defaultValue,
+    })).rejects.toThrow(`Skill output path must be inside target directory: ${join(homeDir, '.codex', 'skills')}`);
   });
 
   it('should install template-backed skill even when composition has no instruction', async () => {
@@ -198,7 +216,7 @@ describe('facet install template-backed skill integration flow', () => {
     const result = await runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['templated-no-instruction', 'Codex']),
+      select: createSelectStub(['templated-no-instruction (global)', 'Codex']),
       input: async (_prompt, defaultValue) => defaultValue,
     });
 
@@ -206,5 +224,44 @@ describe('facet install template-backed skill integration flow', () => {
     expect(readFileSync(skillOutputPath, 'utf-8')).toMatch(/^---\nname: templated-no-instruction-skill\n---\n/m);
     expect(readFileSync(skillOutputPath, 'utf-8')).toContain('instructions=');
     expect(readFileSync(skillOutputPath, 'utf-8')).not.toContain('{{facet:instructions}}');
+  });
+
+  it('should fallback to global template when local composition references missing template', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    createFacetedFixture(homeDir);
+
+    const localFacetedRoot = join(workspaceDir, '.faceted');
+    mkdirSync(join(localFacetedRoot, 'facets', 'persona'), { recursive: true });
+    mkdirSync(join(localFacetedRoot, 'compositions'), { recursive: true });
+    writeFileSync(join(localFacetedRoot, 'facets', 'persona', 'local-coder.md'), 'Local persona', 'utf-8');
+    writeFileSync(
+      join(localFacetedRoot, 'compositions', 'templated.yaml'),
+      [
+        'name: templated-skill',
+        'persona: local-coder',
+        'knowledge:',
+        '  - architecture',
+        'policies:',
+        '  - coding',
+        'template: starter-kit',
+      ].join('\n'),
+      'utf-8',
+    );
+
+    const skillOutputPath = join(homeDir, '.codex', 'skills', 'templated-skill', 'SKILL.md');
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli(['install', 'skill'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['templated (local)', 'Codex']),
+      input: async (prompt, defaultValue) =>
+        prompt.includes('overrides global definition') ? 'y' : defaultValue,
+    });
+
+    expect(result).toEqual({ kind: 'path', path: skillOutputPath });
+    expect(readFileSync(skillOutputPath, 'utf-8')).toContain('Local persona');
+    expect(existsSync(join(homeDir, '.codex', 'skills', 'templated-skill', 'README.md'))).toBe(true);
   });
 });

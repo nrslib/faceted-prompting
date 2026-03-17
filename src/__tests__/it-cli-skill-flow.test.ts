@@ -35,10 +35,15 @@ async function runInit(runFacetCli: CliModule['runFacetCli'], workspaceDir: stri
   });
 }
 
-function createFacetedFixture(homeDir: string): {
+function writeGlobalConfig(homeDir: string): void {
+  const facetedRoot = join(homeDir, '.faceted');
+  mkdirSync(facetedRoot, { recursive: true });
+  writeFileSync(join(facetedRoot, 'config.yaml'), 'version: 1\n', 'utf-8');
+}
+
+function createFacetedFixtureAtRoot(facetedRoot: string): {
   compositionsRoot: string;
 } {
-  const facetedRoot = join(homeDir, '.faceted');
   const facetsRoot = join(facetedRoot, 'facets');
   const compositionsRoot = join(facetedRoot, 'compositions');
 
@@ -66,6 +71,12 @@ function createFacetedFixture(homeDir: string): {
   );
 
   return { compositionsRoot };
+}
+
+function createFacetedFixture(homeDir: string): {
+  compositionsRoot: string;
+} {
+  return createFacetedFixtureAtRoot(join(homeDir, '.faceted'));
 }
 
 function createSelectStub(expectedSelections: readonly string[]) {
@@ -103,7 +114,7 @@ describe('facet skill integration flow', () => {
     const result = await runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['coding', 'Claude Code']),
+      select: createSelectStub(['coding (global)', 'Claude Code']),
       input: async (prompt, defaultValue) =>
         prompt.toLowerCase().includes('output') ? skillOutputPath : defaultValue,
     });
@@ -111,6 +122,52 @@ describe('facet skill integration flow', () => {
     expect(result).toEqual({ kind: 'path', path: skillOutputPath });
     expect(existsSync(skillOutputPath)).toBe(true);
     expect(readFileSync(skillOutputPath, 'utf-8')).toContain('You are a coding agent.');
+  });
+
+  it('should prefer local composition and facets while falling back to global facets for missing refs', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    createFacetedFixture(homeDir);
+
+    const localFacetedRoot = join(workspaceDir, '.faceted');
+    mkdirSync(join(localFacetedRoot, 'facets', 'persona'), { recursive: true });
+    mkdirSync(join(localFacetedRoot, 'compositions'), { recursive: true });
+    writeFileSync(
+      join(localFacetedRoot, 'compositions', 'coding.yaml'),
+      [
+        'name: coding',
+        'description: Local coding workflow',
+        'persona: local-coder',
+        'policies:',
+        '  - coding',
+        'knowledge:',
+        '  - architecture',
+      ].join('\n'),
+      'utf-8',
+    );
+    writeFileSync(
+      join(localFacetedRoot, 'facets', 'persona', 'local-coder.md'),
+      'You are a local coding agent.',
+      'utf-8',
+    );
+
+    const defaultSkillOutputPath = join(homeDir, '.codex', 'skills', 'coding', 'SKILL.md');
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli(['install', 'skill'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['coding (local)', 'Codex']),
+      input: async (prompt, defaultValue) =>
+        prompt.includes('overrides global definition') ? 'y' : defaultValue,
+    });
+
+    expect(result).toEqual({ kind: 'path', path: defaultSkillOutputPath });
+    const skillBody = readFileSync(defaultSkillOutputPath, 'utf-8');
+    expect(skillBody).toContain('You are a local coding agent.');
+    expect(skillBody).toContain('Never hide errors.');
+    expect(skillBody).toContain('Architecture reference.');
   });
 
   it('should require init before install skill', async () => {
@@ -124,7 +181,30 @@ describe('facet skill integration flow', () => {
       homeDir,
       select: async () => 'unused',
       input: async (_prompt, defaultValue) => defaultValue,
-    })).rejects.toThrow(`Missing faceted config: ${join(homeDir, '.faceted', 'config.yaml')}`);
+    })).rejects.toThrow(`No compose definitions found in ${join(homeDir, '.faceted', 'compositions')}`);
+  });
+
+  it('should install skill using local faceted root when global faceted home is not initialized', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    createFacetedFixtureAtRoot(join(workspaceDir, '.faceted'));
+
+    const defaultSkillOutputPath = join(homeDir, '.claude', 'skills', 'coding', 'SKILL.md');
+    const { runFacetCli } = await loadCliModule();
+
+    const result = await runFacetCli(['install', 'skill'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['coding (local)', 'Claude Code']),
+      input: async (_prompt, defaultValue) => defaultValue,
+    });
+
+    expect(result).toEqual({ kind: 'path', path: defaultSkillOutputPath });
+    expect(existsSync(defaultSkillOutputPath)).toBe(true);
+    expect(readFileSync(defaultSkillOutputPath, 'utf-8')).toContain('You are a coding agent.');
+    expect(readFileSync(defaultSkillOutputPath, 'utf-8')).toContain('Never hide errors.');
   });
 
   it('should not offer compositions immediately after init', async () => {
@@ -134,13 +214,16 @@ describe('facet skill integration flow', () => {
 
     const { runFacetCli } = await loadCliModule();
     await runInit(runFacetCli, workspaceDir, homeDir);
+    writeGlobalConfig(homeDir);
 
     await expect(runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
       select: async () => 'unused',
       input: async (_prompt, defaultValue) => defaultValue,
-    })).rejects.toThrow(`No compose definitions found in ${join(homeDir, '.faceted', 'compositions')}`);
+    })).rejects.toThrow(
+      `No compose definitions found in ${join(workspaceDir, '.faceted', 'compositions')}, ${join(homeDir, '.faceted', 'compositions')}`,
+    );
   });
 
   it('should install skill to default Claude Code output path when default input is accepted', async () => {
@@ -155,7 +238,7 @@ describe('facet skill integration flow', () => {
     const result = await runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['coding', 'Claude Code']),
+      select: createSelectStub(['coding (global)', 'Claude Code']),
       input: async (_prompt, defaultValue) => defaultValue,
     });
 
@@ -175,7 +258,7 @@ describe('facet skill integration flow', () => {
     let selectCallCount = 0;
     const select = async (candidates: string[]): Promise<string> => {
       selectCallCount += 1;
-      if (selectCallCount === 1) return 'coding';
+      if (selectCallCount === 1) return 'coding (global)';
       if (selectCallCount === 2) {
         expect(candidates).toEqual(['Claude Code', 'Codex']);
         return 'Claude Code';
@@ -204,7 +287,7 @@ describe('facet skill integration flow', () => {
     const result = await runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['coding', 'Codex']),
+      select: createSelectStub(['coding (global)', 'Codex']),
       input: async (_prompt, defaultValue) => defaultValue,
     });
 
@@ -236,8 +319,13 @@ describe('facet skill integration flow', () => {
       select: async (candidates: string[]): Promise<string> => {
         selectCallCount += 1;
         if (selectCallCount === 1) {
-          expect(candidates).toEqual(['backend', 'coding', 'frontend', 'issue-worktree']);
-          return 'issue-worktree';
+          expect(candidates).toEqual([
+            'backend (global)',
+            'coding (global)',
+            'frontend (global)',
+            'issue-worktree (global)',
+          ]);
+          return 'issue-worktree (global)';
         }
         if (selectCallCount === 2) {
           expect(candidates).toEqual(['Claude Code', 'Codex']);
@@ -269,7 +357,7 @@ describe('facet skill integration flow', () => {
     await expect(runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['unsafe', 'Claude Code']),
+      select: createSelectStub(['unsafe (global)', 'Claude Code']),
       input: async (_prompt, defaultValue) => defaultValue,
     })).rejects.toThrow('Invalid compose definition name: ../unsafe');
   });
@@ -285,10 +373,46 @@ describe('facet skill integration flow', () => {
     await expect(runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['coding', 'Claude Code']),
+      select: createSelectStub(['coding (global)', 'Claude Code']),
       input: async (prompt, defaultValue) =>
         prompt.toLowerCase().includes('output') ? outsidePath : defaultValue,
     })).rejects.toThrow(`Skill output path must be inside home directory: ${outsidePath}`);
+  });
+
+  it('should reject install when output path points to target root SKILL.md', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    createFacetedFixture(homeDir);
+
+    const targetRootOutputPath = join(homeDir, '.claude', 'skills', 'SKILL.md');
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli(['install', 'skill'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['coding (global)', 'Claude Code']),
+      input: async (prompt, defaultValue) =>
+        prompt.toLowerCase().includes('output') ? targetRootOutputPath : defaultValue,
+    })).rejects.toThrow(
+      `Skill output path must include a skill directory under target directory: ${join(homeDir, '.claude', 'skills')}`,
+    );
+  });
+
+  it('should reject install when output path file name is not SKILL.md', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    createFacetedFixture(homeDir);
+
+    const invalidFileNamePath = join(homeDir, '.claude', 'skills', 'coding', 'custom.md');
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli(['install', 'skill'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['coding (global)', 'Claude Code']),
+      input: async (prompt, defaultValue) =>
+        prompt.toLowerCase().includes('output') ? invalidFileNamePath : defaultValue,
+    })).rejects.toThrow(`Skill output path must point to SKILL.md: ${invalidFileNamePath}`);
   });
 
   it('should reject install when skill output path points to a symbolic link', async () => {
@@ -307,10 +431,35 @@ describe('facet skill integration flow', () => {
     await expect(runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
       homeDir,
-      select: createSelectStub(['coding', 'Claude Code']),
+      select: createSelectStub(['coding (global)', 'Claude Code']),
       input: async (prompt, defaultValue) =>
         prompt.toLowerCase().includes('output') ? symlinkPath : defaultValue,
     })).rejects.toThrow(`Symbolic links are not allowed for skill output file: ${symlinkPath}`);
+  });
+
+  it('should require explicit confirmation when local composition overrides global definition', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    createFacetedFixture(homeDir);
+
+    const localFacetedRoot = join(workspaceDir, '.faceted');
+    mkdirSync(join(localFacetedRoot, 'facets', 'persona'), { recursive: true });
+    mkdirSync(join(localFacetedRoot, 'compositions'), { recursive: true });
+    writeFileSync(join(localFacetedRoot, 'facets', 'persona', 'local-coder.md'), 'local', 'utf-8');
+    writeFileSync(
+      join(localFacetedRoot, 'compositions', 'coding.yaml'),
+      ['name: coding', 'persona: local-coder', 'policies:', '  - coding', 'knowledge:', '  - architecture'].join('\n'),
+      'utf-8',
+    );
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli(['install', 'skill'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['coding (local)', 'Codex']),
+      input: async (_prompt, defaultValue) => defaultValue,
+    })).rejects.toThrow('Install was cancelled for local composition: coding');
   });
 
   it('should reject unsupported commands without skill subcommand', async () => {
