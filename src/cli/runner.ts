@@ -4,6 +4,7 @@ import { createInterface } from 'node:readline/promises';
 import { pathToFileURL } from 'node:url';
 import { runFacetCli } from './index.js';
 import { selectInteractive } from './select.js';
+import { checkForUpdates } from './update-check.js';
 
 async function inputInteractive(prompt: string, defaultValue: string): Promise<string> {
   const rl = createInterface({ input, output });
@@ -19,6 +20,7 @@ async function inputInteractive(prompt: string, defaultValue: string): Promise<s
 }
 
 export interface RunnerDependencies {
+  readonly checkForUpdates: () => Promise<void>;
   readonly runFacetCli: typeof runFacetCli;
   readonly writeStdout: (message: string) => void;
   readonly writeStderr: (message: string) => void;
@@ -27,6 +29,7 @@ export interface RunnerDependencies {
 
 function defaultDependencies(): RunnerDependencies {
   return {
+    checkForUpdates,
     runFacetCli,
     writeStdout: message => {
       output.write(message);
@@ -48,6 +51,15 @@ export async function runMain(
   argv: string[],
   dependencies: RunnerDependencies = defaultDependencies(),
 ): Promise<void> {
+  try {
+    const updateCheckTask = dependencies.checkForUpdates();
+    void updateCheckTask.catch((error: unknown) => {
+      dependencies.writeStderr(`update check failed: ${toErrorMessage(error)}\n`);
+    });
+  } catch (error: unknown) {
+    dependencies.writeStderr(`update check failed: ${toErrorMessage(error)}\n`);
+  }
+
   try {
     const result = await dependencies.runFacetCli(argv, {
       cwd: process.cwd(),
