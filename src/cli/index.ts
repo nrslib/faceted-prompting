@@ -1,17 +1,15 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { compose } from '../compose.js';
 import {
   initializeGlobalFaceted,
   initializeLocalFaceted,
   listPullSampleTargetPaths,
   pullSampleFacets,
 } from '../init/index.js';
-import { formatCombinedOutput, resolveOutputDirectory, writeComposeOutput } from '../output/index.js';
-import { resolveComposeContext } from './compose-context.js';
-import { buildFacetSet, ensureSafeDefinitionName } from './skill-renderer.js';
 import {
-  getSkillPaths,
+  runComposeCommand,
+} from './compose-command.js';
+import {
   runInstallSkillCommand,
 } from './skill-commands.js';
 import type { FacetCliOptions, FacetCliResult } from './types.js';
@@ -39,99 +37,6 @@ function ensureSkillSubcommand(command: string, subcommand: string | undefined):
   if (subcommand !== 'skill') {
     throw new Error(`Unsupported command: ${command}`);
   }
-}
-
-async function runComposeCommand(options: FacetCliOptions): Promise<FacetCliResult> {
-  const { facetsRoots, facetedRoots } = getSkillPaths(options.cwd, options.homeDir);
-  const composeContext = resolveComposeContext(options.cwd);
-  const definition = {
-    name: composeContext.name,
-    persona: 'coder',
-    policies: ['coding', 'ai-antipattern'],
-    knowledge: composeContext.knowledgeRefs,
-    instruction: composeContext.relatedInstruction,
-    order: ['policies', 'knowledge', 'instruction'] as const,
-  };
-  const definitionDir = facetedRoots[0];
-  if (!definitionDir) {
-    throw new Error('Faceted root is required');
-  }
-
-  const facetSet = buildFacetSet({
-    definitionDir,
-    facetsRoots,
-    definition,
-  });
-
-  const composed = compose(facetSet, {
-    contextMaxChars: 2000,
-    userMessageOrder: definition.order,
-  });
-
-  const splitSelection = await options.select(
-    ['Combined (single file)', 'Split (system + user)'],
-    'Choose output mode with Up/Down and Enter:',
-  );
-  const splitSystem = splitSelection === 'Split (system + user)';
-
-  const outputInput = await options.input('Output directory', options.cwd);
-  const outputDir = resolveOutputDirectory(outputInput, options.cwd);
-  const safeName = ensureSafeDefinitionName(definition.name);
-  const outputPlans = splitSystem
-    ? [
-        {
-          fileName: `${safeName}.system.md`,
-          content: `${composed.systemPrompt}\n`,
-        },
-        {
-          fileName: `${safeName}.user.md`,
-          content: `${composed.userMessage}\n`,
-        },
-      ]
-    : [
-        {
-          fileName: `${safeName}.md`,
-          content: formatCombinedOutput(composed),
-        },
-      ];
-  const existingPaths = outputPlans
-    .map(plan => resolve(outputDir, plan.fileName))
-    .filter(path => existsSync(path));
-  let overwrite = false;
-
-  if (existingPaths.length > 0) {
-    const overwriteAnswer = await options.input(
-      `Output file exists. Overwrite? (${existingPaths.join(', ')}) [y/N]`,
-      'n',
-    );
-
-    if (!shouldOverwrite(overwriteAnswer)) {
-      throw new Error(`Output file exists and overwrite was cancelled: ${existingPaths.join(', ')}`);
-    }
-    overwrite = true;
-  }
-
-  const outputPaths: string[] = [];
-  for (const plan of outputPlans) {
-    outputPaths.push(await writeComposeOutput({
-      outputDir,
-      fileName: plan.fileName,
-      content: plan.content,
-      overwrite,
-    }));
-  }
-
-  if (outputPaths.length === 1) {
-    return {
-      kind: 'path',
-      path: outputPaths[0]!,
-    };
-  }
-
-  return {
-    kind: 'paths',
-    paths: outputPaths,
-  };
 }
 
 export async function runFacetCli(

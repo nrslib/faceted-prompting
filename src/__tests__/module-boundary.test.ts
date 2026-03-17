@@ -24,4 +24,12 @@ describe('module boundary', () => {
     expect('ensureDirectoryExists' in flowModule).toBe(false);
     expect('runTemplateApplyInstall' in modesModule).toBe(false);
   });
+
+  it('should keep composition source helpers internal to skill commands', async () => {
+    const skillCommandsModulePath = pathToFileURL(resolve('src/cli/skill-commands.ts')).href;
+    const skillCommandsModule = await import(skillCommandsModulePath);
+
+    expect('resolveCompositionSource' in skillCommandsModule).toBe(false);
+    expect('hasGlobalCompositionShadow' in skillCommandsModule).toBe(false);
+  });
 });
