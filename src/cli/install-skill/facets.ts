@@ -14,12 +14,8 @@ import {
   resolveBoundedOutputFilePath,
   writeUtf8FileWithoutFollowingSymbolicLinks,
 } from './facet-token-file-ops.js';
-
-const FACET_TOKEN_PATTERN = /{{facet:(persona|knowledges|policies|instructions)}}/g;
-const FACET_TOKEN_TEST = /{{facet:(persona|knowledges|policies|instructions)}}/;
-
-type FacetPlaceholderKey = 'persona' | 'knowledges' | 'policies' | 'instructions';
-type FacetTokenValues = Record<FacetPlaceholderKey, string>;
+import { hasFacetToken, replaceFacetTokens } from './facet-token-renderer.js';
+import type { FacetTokenValues } from './facet-token-renderer.js';
 
 export type SkillSections = ReturnType<typeof buildSkillSections>;
 
@@ -67,12 +63,6 @@ export function buildInlineFacetTokenValues(sections: SkillSections): FacetToken
   };
 }
 
-function replaceFacetTokens(content: string, values: FacetTokenValues): string {
-  return content.replaceAll(FACET_TOKEN_PATTERN, (_match, token: FacetPlaceholderKey) => {
-    return values[token];
-  });
-}
-
 function applyFacetTokensToSingleFile(params: {
   filePath: string;
   tokenValues: FacetTokenValues;
@@ -80,7 +70,7 @@ function applyFacetTokensToSingleFile(params: {
 }): void {
   const boundedPath = resolveBoundedOutputFilePath(params.filePath, params.rootDir);
   const original = readUtf8FileWithoutFollowingSymbolicLinks(boundedPath.filePath);
-  if (!FACET_TOKEN_TEST.test(original)) {
+  if (!hasFacetToken(original)) {
     return;
   }
 

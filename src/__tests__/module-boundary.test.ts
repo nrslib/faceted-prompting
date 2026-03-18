@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -31,5 +32,12 @@ describe('module boundary', () => {
 
     expect('resolveCompositionSource' in skillCommandsModule).toBe(false);
     expect('hasGlobalCompositionShadow' in skillCommandsModule).toBe(false);
+  });
+
+  it('should keep install facets orchestration file within size boundary', () => {
+    const facetsModulePath = resolve('src/cli/install-skill/facets.ts');
+    const lineCount = readFileSync(facetsModulePath, 'utf-8').split('\n').length;
+
+    expect(lineCount).toBeLessThanOrEqual(300);
   });
 });
