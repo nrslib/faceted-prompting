@@ -462,6 +462,36 @@ describe('facet skill integration flow', () => {
     })).rejects.toThrow('Install was cancelled for local composition: coding');
   });
 
+  it('should continue install when local shadow confirmation is yes with extra spaces', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    createFacetedFixture(homeDir);
+
+    const localFacetedRoot = join(workspaceDir, '.faceted');
+    mkdirSync(join(localFacetedRoot, 'facets', 'persona'), { recursive: true });
+    mkdirSync(join(localFacetedRoot, 'compositions'), { recursive: true });
+    writeFileSync(join(localFacetedRoot, 'facets', 'persona', 'local-coder.md'), 'local', 'utf-8');
+    writeFileSync(
+      join(localFacetedRoot, 'compositions', 'coding.yaml'),
+      ['name: coding', 'persona: local-coder', 'policies:', '  - coding', 'knowledge:', '  - architecture'].join('\n'),
+      'utf-8',
+    );
+
+    const outputPath = join(homeDir, '.codex', 'skills', 'coding', 'SKILL.md');
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli(['install', 'skill'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['coding (local)', 'Codex']),
+      input: async (prompt, defaultValue) =>
+        prompt.includes('overrides global definition') ? '  YeS  ' : defaultValue,
+    });
+
+    expect(result).toEqual({ kind: 'path', path: outputPath });
+    expect(existsSync(outputPath)).toBe(true);
+  });
+
   it('should reject unsupported commands without skill subcommand', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));

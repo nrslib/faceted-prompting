@@ -8,6 +8,7 @@ import {
   listCompositionDefinitions,
 } from './skill-renderer.js';
 import type { FacetCliOptions, FacetCliResult } from './types.js';
+import { shouldOverwrite } from './install-skill/flow.js';
 import { runSkillDeployInstall } from './install-skill/modes.js';
 
 export function getSkillPaths(cwd: string, homeDir: string): {
@@ -55,14 +56,14 @@ function hasGlobalCompositionShadow(
   return false;
 }
 
-export async function runInstallSkillCommand(options: FacetCliOptions): Promise<FacetCliResult> {
-  const { facetedRoots, facetsRoots, compositionsDirs } = getSkillPaths(options.cwd, options.homeDir);
-  const localFacetedRoot = getFacetedRoot(options.cwd);
-  const globalFacetedRoot = getFacetedRoot(options.homeDir);
-  const localCompositionsDir = existsSync(localFacetedRoot) ? join(localFacetedRoot, 'compositions') : undefined;
-  const globalCompositionsDir = join(globalFacetedRoot, 'compositions');
-
-  const definitionMap = listCompositionDefinitions(compositionsDirs);
+export async function selectCompositionDefinitionPath(params: {
+  options: FacetCliOptions;
+  compositionDefinitionDirs: readonly string[];
+  localCompositionsDir: string | undefined;
+  globalCompositionsDir: string;
+  cancelAction: 'Install' | 'Compose';
+}): Promise<{ definitionPath: string }> {
+  const definitionMap = listCompositionDefinitions(params.compositionDefinitionDirs);
   const compositionCandidates = Object.keys(definitionMap)
     .sort()
     .map(name => {
@@ -70,14 +71,15 @@ export async function runInstallSkillCommand(options: FacetCliOptions): Promise<
       if (!definitionPath) {
         throw new Error(`Unknown compose definition: ${name}`);
       }
-      const source = resolveCompositionSource(definitionPath, localCompositionsDir);
+      const source = resolveCompositionSource(definitionPath, params.localCompositionsDir);
       return source === 'local' ? `${name} (local)` : `${name} (global)`;
     });
+
   if (compositionCandidates.length === 0) {
-    throw new Error(`No compose definitions found in ${compositionsDirs.join(', ')}`);
+    throw new Error(`No compose definitions found in ${params.compositionDefinitionDirs.join(', ')}`);
   }
 
-  const selectedLabel = await options.select(
+  const selectedLabel = await params.options.select(
     compositionCandidates,
     'Choose composition with Up/Down and Enter:',
   );
@@ -88,18 +90,35 @@ export async function runInstallSkillCommand(options: FacetCliOptions): Promise<
   }
 
   if (
-    resolveCompositionSource(definitionPath, localCompositionsDir) === 'local' &&
-    hasGlobalCompositionShadow(selectedComposition, globalCompositionsDir)
+    resolveCompositionSource(definitionPath, params.localCompositionsDir) === 'local' &&
+    hasGlobalCompositionShadow(selectedComposition, params.globalCompositionsDir)
   ) {
-    const approved = await options.input(
+    const approved = await params.options.input(
       `Local composition "${selectedComposition}" overrides global definition. Continue? [y/N]`,
       'n',
     );
-    const normalized = approved.trim().toLowerCase();
-    if (normalized !== 'y' && normalized !== 'yes') {
-      throw new Error(`Install was cancelled for local composition: ${selectedComposition}`);
+    if (!shouldOverwrite(approved)) {
+      throw new Error(`${params.cancelAction} was cancelled for local composition: ${selectedComposition}`);
     }
   }
+
+  return { definitionPath };
+}
+
+export async function runInstallSkillCommand(options: FacetCliOptions): Promise<FacetCliResult> {
+  const { facetedRoots, facetsRoots, compositionsDirs } = getSkillPaths(options.cwd, options.homeDir);
+  const localFacetedRoot = getFacetedRoot(options.cwd);
+  const globalFacetedRoot = getFacetedRoot(options.homeDir);
+  const localCompositionsDir = existsSync(localFacetedRoot) ? join(localFacetedRoot, 'compositions') : undefined;
+  const globalCompositionsDir = join(globalFacetedRoot, 'compositions');
+
+  const { definitionPath } = await selectCompositionDefinitionPath({
+    options,
+    compositionDefinitionDirs: compositionsDirs,
+    localCompositionsDir,
+    globalCompositionsDir,
+    cancelAction: 'Install',
+  });
 
   const definition = await loadComposeDefinition(definitionPath);
   const safeSkillName = ensureSafeDefinitionName(definition.name);
