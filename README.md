@@ -63,8 +63,11 @@ const result = compose(
 ### As a CLI
 
 ```bash
-# Create local defaults under ~/.faceted
+# Create local .faceted/ in current directory
 facet init
+
+# Initialize global ~/.faceted/ and pull sample facets
+facet init global
 
 # Pull sample facets from TAKT on GitHub
 facet pull-sample
@@ -76,10 +79,19 @@ facet compose
 facet install skill
 ```
 
-`facet init` creates `~/.faceted/` with config and empty directories. Run `facet pull-sample` to populate sample facets, compositions, and templates:
+`facet init` creates `.faceted/` in the current directory with config and empty directories. `facet init global` initializes `~/.faceted/` and pulls sample facets. Run `facet pull-sample` to update sample facets, compositions, and templates:
 
 ```
-~/.faceted/
+.faceted/                       # Local (per-project)
+├── config.yaml
+├── facets/
+│   ├── persona/
+│   ├── knowledge/
+│   ├── policies/
+│   └── compositions/
+└── templates/
+
+~/.faceted/                     # Global (fallback)
 ├── config.yaml
 ├── facets/
 │   ├── persona/          # Persona Markdown files
@@ -93,7 +105,8 @@ facet install skill
 
 | Command | Description |
 |---------|-------------|
-| `facet init` | Create local config and empty facet directories |
+| `facet init` | Create local `.faceted/` in current directory |
+| `facet init global` | Initialize global `~/.faceted/` and pull sample facets |
 | `facet pull-sample` | Pull sample coding facets from TAKT on GitHub |
 | `facet compose` | Auto-detect context, compose prompts, and write to files |
 | `facet install skill` | Install a skill with facets to Claude Code or Codex |
@@ -182,7 +195,16 @@ See the [API Reference](./docs/api-reference.md) for the full API surface.
 ## Project Structure
 
 ```
-~/.faceted/                     # Global config (created on first run)
+.faceted/                       # Local (per-project, created by `facet init`)
+├── config.yaml
+├── facets/
+│   ├── persona/
+│   ├── knowledge/
+│   ├── policies/
+│   └── compositions/
+└── templates/
+
+~/.faceted/                     # Global (fallback, created by `facet init global`)
 ├── config.yaml
 ├── facets/
 │   ├── persona/
@@ -192,6 +214,8 @@ See the [API Reference](./docs/api-reference.md) for the full API surface.
 ├── templates/                  # Skill install templates
 └── repertoire/                 # Installed repertoire packages
 ```
+
+Facet resolution is local-first: local `.faceted/facets/` is checked before global `~/.faceted/facets/`.
 
 ## Documentation
 

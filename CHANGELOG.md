@@ -4,6 +4,24 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-18
+
+### Added
+- ローカル `.faceted/` ディレクトリのサポート。プロジェクトディレクトリ直下の `.faceted/` にファセットや compositions を配置でき、グローバル `~/.faceted/` へのフォールバック付きで先に解決される
+- `facet init` がカレントディレクトリにローカル `.faceted/` を作成するよう変更。グローバル初期化は `facet init global` で実行
+- テンプレートのファセットトークン (`{{facet:xxx}}`) が複数行の値を自動インデントするようになった。プレースホルダの行頭インデントに合わせて後続行にインデントが適用される。`{{facet:xxx | indent:none}}` で無効化可能 (#24)
+- CLI 起動時にパッケージの新バージョンを自動チェックする update notifier を追加 (#18)
+
+### Changed
+- `facet compose` が composition 定義の `template` フィールドに基づくテンプレートベースの合成に対応。ローカル/グローバル両方の compositions ディレクトリからの選択が可能に (#20)
+- ファセット解決がローカル優先の複数ルート (`facetsRoots`) に対応。ローカル `.faceted/facets/` → グローバル `~/.faceted/facets/` の順で first-match-wins (#20)
+- テンプレートファイルコピー時のファイルレベル上書き確認とシンボリックリンクチェックによるセキュリティ強化 (#22)
+
+### Internal
+- `compose` コマンドを `compose-command.ts` に分離しモジュール化
+- ファセットトークン処理を `facet-token-renderer.ts` / `facet-token-file-ops.ts` に分離
+- テストカバレッジ追加: runner, path-guard, update-check, install-skill facets/flow, module-boundary, skill-renderer regression
+
 ## [0.2.1] - 2026-03-12
 
 ### Changed
