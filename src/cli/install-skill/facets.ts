@@ -1,7 +1,20 @@
-import { basename, join } from 'node:path';
-import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { basename, dirname, join, resolve } from 'node:path';
+import {
+  closeSync,
+  constants,
+  copyFileSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  openSync,
+  readFileSync,
+  readdirSync,
+  realpathSync,
+  writeFileSync,
+} from 'node:fs';
 import type { buildSkillSections } from '../skill-renderer.js';
 import type { CopyFiles } from '../../types.js';
+import { ensurePathAncestorsContainNoSymbolicLinks, isWithinRoot } from '../path-guard.js';
 
 const FACET_TOKEN_PATTERN = /{{facet:(persona|knowledges|policies|instructions)}}/g;
 const FACET_TOKEN_TEST = /{{facet:(persona|knowledges|policies|instructions)}}/;
@@ -59,6 +72,103 @@ function replaceFacetTokens(content: string, values: FacetTokenValues): string {
   return content.replaceAll(FACET_TOKEN_PATTERN, (_match, token: FacetPlaceholderKey) => {
     return values[token];
   });
+}
+
+function readUtf8FileWithoutFollowingSymbolicLinks(filePath: string): string {
+  const openFlags = constants.O_RDONLY | constants.O_NOFOLLOW;
+
+  let fileDescriptor: number;
+  try {
+    fileDescriptor = openSync(filePath, openFlags);
+  } catch (error: unknown) {
+    const errorCode = (error as NodeJS.ErrnoException).code;
+    if (errorCode === 'ELOOP') {
+      throw new Error(`Symbolic links are not allowed for output file: ${filePath}`);
+    }
+    throw error;
+  }
+
+  try {
+    return readFileSync(fileDescriptor, 'utf-8');
+  } finally {
+    closeSync(fileDescriptor);
+  }
+}
+
+function writeUtf8FileWithoutFollowingSymbolicLinks(filePath: string, content: string): void {
+  const openFlags = constants.O_WRONLY | constants.O_TRUNC | constants.O_NOFOLLOW;
+
+  let fileDescriptor: number;
+  try {
+    fileDescriptor = openSync(filePath, openFlags);
+  } catch (error: unknown) {
+    const errorCode = (error as NodeJS.ErrnoException).code;
+    if (errorCode === 'ELOOP') {
+      throw new Error(`Symbolic links are not allowed for output file: ${filePath}`);
+    }
+    throw error;
+  }
+
+  try {
+    writeFileSync(fileDescriptor, content, 'utf-8');
+  } finally {
+    closeSync(fileDescriptor);
+  }
+}
+
+function resolveBoundedOutputFilePath(filePath: string, rootDir: string): { filePath: string; rootRealPath: string } {
+  const resolvedRootDir = resolve(rootDir);
+  const resolvedFilePath = resolve(filePath);
+
+  ensurePathAncestorsContainNoSymbolicLinks(resolvedFilePath, 'Output directory', resolvedRootDir);
+  const rootRealPath = realpathSync(resolvedRootDir);
+
+  const parentDir = dirname(resolvedFilePath);
+  if (!existsSync(parentDir)) {
+    throw new Error(`Output file directory does not exist: ${parentDir}`);
+  }
+
+  const parentRealPath = realpathSync(parentDir);
+  if (!isWithinRoot(parentRealPath, rootRealPath)) {
+    throw new Error(`Output path escapes target directory: ${resolvedFilePath}`);
+  }
+
+  const boundedFilePath = join(parentRealPath, basename(resolvedFilePath));
+  if (!existsSync(boundedFilePath)) {
+    throw new Error(`Output file does not exist: ${resolvedFilePath}`);
+  }
+
+  if (lstatSync(boundedFilePath).isSymbolicLink()) {
+    throw new Error(`Symbolic links are not allowed for output file: ${resolvedFilePath}`);
+  }
+
+  return {
+    filePath: boundedFilePath,
+    rootRealPath,
+  };
+}
+
+function applyFacetTokensToSingleFile(params: {
+  filePath: string;
+  tokenValues: FacetTokenValues;
+  rootDir: string;
+}): void {
+  const boundedPath = resolveBoundedOutputFilePath(params.filePath, params.rootDir);
+  const original = readUtf8FileWithoutFollowingSymbolicLinks(boundedPath.filePath);
+  if (!FACET_TOKEN_TEST.test(original)) {
+    return;
+  }
+
+  const replaced = replaceFacetTokens(original, params.tokenValues);
+  if (replaced === original) {
+    return;
+  }
+
+  writeUtf8FileWithoutFollowingSymbolicLinks(boundedPath.filePath, replaced);
+  const outputRealPath = realpathSync(boundedPath.filePath);
+  if (!isWithinRoot(outputRealPath, boundedPath.rootRealPath)) {
+    throw new Error(`Output path escapes target directory: ${params.filePath}`);
+  }
 }
 
 export function buildSectionsWithCopiedPaths(
@@ -196,19 +306,29 @@ export function applyFacetTokensToPath(params: {
         continue;
       }
 
-      const original = readFileSync(entryPath, 'utf-8');
-      if (!FACET_TOKEN_TEST.test(original)) {
-        continue;
-      }
-
-      const replaced = replaceFacetTokens(original, tokenValues);
-      if (replaced !== original) {
-        writeFileSync(entryPath, replaced, 'utf-8');
-      }
+      applyFacetTokensToSingleFile({
+        filePath: entryPath,
+        tokenValues,
+        rootDir,
+      });
     }
   };
 
   visit(rootDir, 0);
+}
+
+export function applyFacetTokensToFiles(params: {
+  filePaths: readonly string[];
+  tokenValues: FacetTokenValues;
+  rootDir: string;
+}): void {
+  for (const filePath of params.filePaths) {
+    applyFacetTokensToSingleFile({
+      filePath,
+      tokenValues: params.tokenValues,
+      rootDir: params.rootDir,
+    });
+  }
 }
 
 export function parseScanDepth(rawDepth: string): number {
