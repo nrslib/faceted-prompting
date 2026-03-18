@@ -655,7 +655,62 @@ describe('facet compose integration flow', () => {
         }
         throw new Error(`Unexpected prompt: ${prompt}`);
       },
-    })).rejects.toThrow(`Symbolic links are not allowed in Output directory path: ${outputDirSymlink}`);
+    })).rejects.toThrow(`Symbolic links are not allowed for Output directory: ${outputDirSymlink}`);
+  });
+
+  it('should reject template-backed compose when output directory symlink is outside cwd', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    const outsideRootDir = mkdtempSync(join(tmpdir(), 'facet-outside-'));
+    tempDirs.push(workspaceDir, homeDir, outsideRootDir);
+    writeTemplateCompositionFixture(homeDir);
+
+    const realOutputDir = join(outsideRootDir, 'templated-output-real');
+    const outputDirSymlink = join(outsideRootDir, 'templated-output-link');
+    mkdirSync(realOutputDir, { recursive: true });
+    symlinkSync(realOutputDir, outputDirSymlink);
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli(['compose'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['templated (global)']),
+      input: async (prompt, defaultValue) => {
+        if (prompt === 'Output directory') {
+          expect(defaultValue).toBe(workspaceDir);
+          return outputDirSymlink;
+        }
+        throw new Error(`Unexpected prompt: ${prompt}`);
+      },
+    })).rejects.toThrow(`Symbolic links are not allowed for Output directory: ${outputDirSymlink}`);
+  });
+
+  it('should reject template-backed compose when missing output directory has symlink ancestor outside cwd', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    const outsideRootDir = mkdtempSync(join(tmpdir(), 'facet-outside-'));
+    tempDirs.push(workspaceDir, homeDir, outsideRootDir);
+    writeTemplateCompositionFixture(homeDir);
+
+    const realOutputRootDir = join(outsideRootDir, 'templated-output-real');
+    const outputRootSymlink = join(outsideRootDir, 'templated-output-link');
+    const nestedOutputDir = join(outputRootSymlink, 'nested-output');
+    mkdirSync(realOutputRootDir, { recursive: true });
+    symlinkSync(realOutputRootDir, outputRootSymlink);
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli(['compose'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['templated (global)']),
+      input: async (prompt, defaultValue) => {
+        if (prompt === 'Output directory') {
+          expect(defaultValue).toBe(workspaceDir);
+          return nestedOutputDir;
+        }
+        throw new Error(`Unexpected prompt: ${prompt}`);
+      },
+    })).rejects.toThrow(`Symbolic links are not allowed in Output directory path: ${outputRootSymlink}`);
   });
 
   it('should cancel overwrite when output file exists and answer is not y/yes', async () => {

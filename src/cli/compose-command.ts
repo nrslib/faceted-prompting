@@ -21,7 +21,7 @@ import {
   shouldOverwrite,
 } from './install-skill/flow.js';
 import { applyFacetTokensToFiles, buildInlineFacetTokenValues } from './install-skill/facets.js';
-import { ensurePathAncestorsContainNoSymbolicLinks } from './path-guard.js';
+import { ensurePathAncestorsContainNoSymbolicLinks, ensurePathIsNotSymbolicLink } from './path-guard.js';
 
 function buildComposeOutputPlans(params: {
   safeName: string;
@@ -89,6 +89,7 @@ async function runTemplateBackedCompose(params: {
   const outputInput = await params.options.input('Output directory', params.options.cwd);
   const outputDir = resolveOutputDirectory(outputInput, params.options.cwd);
 
+  ensurePathIsNotSymbolicLink(outputDir, 'Output directory');
   ensurePathAncestorsContainNoSymbolicLinks(outputDir, 'Output directory', params.options.cwd);
   mkdirSync(outputDir, { recursive: true });
 

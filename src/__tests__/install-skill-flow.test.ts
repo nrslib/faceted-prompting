@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync,
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { collectDirectoryFiles, copyDirectoryTree } from '../cli/install-skill/flow.js';
+import { collectDirectoryFiles, copyDirectoryTree, ensureRegenerationTargetDir } from '../cli/install-skill/flow.js';
 
 describe('collectDirectoryFiles', () => {
   it('should collect nested files as relative paths', () => {
@@ -149,6 +149,59 @@ describe('copyDirectoryTree', () => {
       expect(tempFiles).toEqual([]);
     } finally {
       rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('ensureRegenerationTargetDir', () => {
+  it('should reject symlink target directory even when target is outside cwd', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-flow-'));
+    const outsideBaseDir = mkdtempSync(join(tmpdir(), 'facet-flow-outside-'));
+
+    try {
+      const realTargetDir = join(outsideBaseDir, 'real');
+      const targetDirSymlink = join(outsideBaseDir, 'target-link');
+      mkdirSync(realTargetDir, { recursive: true });
+      symlinkSync(realTargetDir, targetDirSymlink);
+
+      await expect(ensureRegenerationTargetDir({
+        targetDir: targetDirSymlink,
+        options: {
+          cwd: workspaceDir,
+          input: async () => 'n',
+          select: async () => '',
+        },
+        promptLabel: 'Target directory',
+      })).rejects.toThrow(`Symbolic links are not allowed for Target directory: ${targetDirSymlink}`);
+    } finally {
+      rmSync(workspaceDir, { recursive: true, force: true });
+      rmSync(outsideBaseDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should reject symlink ancestor for missing target directory outside cwd', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-flow-'));
+    const outsideBaseDir = mkdtempSync(join(tmpdir(), 'facet-flow-outside-'));
+
+    try {
+      const realRootDir = join(outsideBaseDir, 'real-root');
+      const linkedRootDir = join(outsideBaseDir, 'linked-root');
+      const nestedTargetDir = join(linkedRootDir, 'nested-target');
+      mkdirSync(realRootDir, { recursive: true });
+      symlinkSync(realRootDir, linkedRootDir);
+
+      await expect(ensureRegenerationTargetDir({
+        targetDir: nestedTargetDir,
+        options: {
+          cwd: workspaceDir,
+          input: async () => 'n',
+          select: async () => '',
+        },
+        promptLabel: 'Target directory',
+      })).rejects.toThrow(`Symbolic links are not allowed in Target directory path: ${linkedRootDir}`);
+    } finally {
+      rmSync(workspaceDir, { recursive: true, force: true });
+      rmSync(outsideBaseDir, { recursive: true, force: true });
     }
   });
 });

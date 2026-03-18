@@ -17,6 +17,7 @@ import { basename, dirname, join, resolve } from 'node:path';
 import {
   ensurePathAncestorsAndRealPathWithinHome,
   ensurePathAncestorsContainNoSymbolicLinks,
+  ensurePathIsNotSymbolicLink,
   isWithinRoot,
   ensurePathWithinRoots,
 } from '../path-guard.js';
@@ -197,6 +198,7 @@ function ensurePathSafety(params: {
     return;
   }
 
+  ensurePathIsNotSymbolicLink(params.targetDir, params.promptLabel);
   ensurePathAncestorsContainNoSymbolicLinks(params.targetDir, params.promptLabel, params.cwd);
 }
 
