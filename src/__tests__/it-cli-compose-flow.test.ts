@@ -441,12 +441,14 @@ describe('facet compose integration flow', () => {
     writeTemplateCompositionFixture(homeDir);
 
     const outputDir = join(workspaceDir, 'templated-output');
+    const inputPrompts: string[] = [];
     const { runFacetCli } = await loadCliModule();
     const result = await runFacetCli(['compose'], {
       cwd: workspaceDir,
       homeDir,
       select: createSelectStub(['templated (global)']),
-      input: async (_prompt, defaultValue) => {
+      input: async (prompt, defaultValue) => {
+        inputPrompts.push(prompt);
         expect(defaultValue).toBe(workspaceDir);
         return outputDir;
       },
@@ -464,6 +466,251 @@ describe('facet compose integration flow', () => {
     expect(readFileSync(renderedPath, 'utf-8')).toContain('Template coding policy.');
     expect(readFileSync(renderedPath, 'utf-8')).toContain('Keep template output deterministic.');
     expect(existsSync(join(outputDir, 'README.md'))).toBe(true);
+    expect(inputPrompts.some(prompt => prompt.includes('[y/N]'))).toBe(false);
+  });
+
+  it('should overwrite conflicting template-backed files only when answer is y/yes', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    writeTemplateCompositionFixture(homeDir);
+
+    const outputDir = join(workspaceDir, 'templated-output');
+    mkdirSync(outputDir, { recursive: true });
+    const renderedPath = join(outputDir, 'prompt.yaml');
+    writeFileSync(renderedPath, 'existing template output', 'utf-8');
+
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli(['compose'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['templated (global)']),
+      input: async (prompt, defaultValue) => {
+        if (prompt === 'Output directory') {
+          expect(defaultValue).toBe(workspaceDir);
+          return outputDir;
+        }
+        expect(prompt).toContain('Output files exist. Overwrite?');
+        expect(prompt).toContain(renderedPath);
+        expect(prompt).toContain('[y/N]');
+        return 'yes';
+      },
+    });
+
+    expect(result.kind).toBe('path');
+    if (result.kind !== 'path') {
+      throw new Error('Expected path result for compose command');
+    }
+    expect(result.path).toBe(outputDir);
+    expect(readFileSync(renderedPath, 'utf-8')).toContain('You are a template coding agent.');
+  });
+
+  it('should cancel template-backed overwrite when conflict answer is not y/yes', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    writeTemplateCompositionFixture(homeDir);
+
+    const outputDir = join(workspaceDir, 'templated-output');
+    mkdirSync(outputDir, { recursive: true });
+    const renderedPath = join(outputDir, 'prompt.yaml');
+    writeFileSync(renderedPath, 'existing template output', 'utf-8');
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli(['compose'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['templated (global)']),
+      input: async (prompt, defaultValue) => {
+        if (prompt === 'Output directory') {
+          expect(defaultValue).toBe(workspaceDir);
+          return outputDir;
+        }
+        expect(prompt).toContain('Output files exist. Overwrite?');
+        expect(prompt).toContain(renderedPath);
+        expect(prompt).toContain('[y/N]');
+        return 'n';
+      },
+    })).rejects.toThrow(`Output files exist and overwrite was cancelled: ${renderedPath}`);
+
+    expect(readFileSync(renderedPath, 'utf-8')).toBe('existing template output');
+  });
+
+  it('should keep unrelated files in template-backed output directory', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    writeTemplateCompositionFixture(homeDir);
+
+    const outputDir = join(workspaceDir, 'templated-output');
+    mkdirSync(outputDir, { recursive: true });
+    const unrelatedPath = join(outputDir, 'unrelated.txt');
+    writeFileSync(unrelatedPath, 'keep me', 'utf-8');
+
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli(['compose'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['templated (global)']),
+      input: async (prompt, defaultValue) => {
+        if (prompt === 'Output directory') {
+          expect(defaultValue).toBe(workspaceDir);
+          return outputDir;
+        }
+        throw new Error(`Unexpected overwrite prompt: ${prompt}`);
+      },
+    });
+
+    expect(result.kind).toBe('path');
+    if (result.kind !== 'path') {
+      throw new Error('Expected path result for compose command');
+    }
+    expect(result.path).toBe(outputDir);
+    expect(readFileSync(unrelatedPath, 'utf-8')).toBe('keep me');
+    expect(existsSync(join(outputDir, 'prompt.yaml'))).toBe(true);
+    expect(existsSync(join(outputDir, 'README.md'))).toBe(true);
+  });
+
+  it('should not replace facet tokens in unrelated existing files for template-backed compose', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    writeTemplateCompositionFixture(homeDir);
+
+    const outputDir = join(workspaceDir, 'templated-output');
+    mkdirSync(outputDir, { recursive: true });
+    const unrelatedPath = join(outputDir, 'unrelated-with-token.md');
+    const unrelatedContent = 'must stay: {{facet:persona}}';
+    writeFileSync(unrelatedPath, unrelatedContent, 'utf-8');
+
+    const { runFacetCli } = await loadCliModule();
+    await runFacetCli(['compose'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['templated (global)']),
+      input: async (prompt, defaultValue) => {
+        if (prompt === 'Output directory') {
+          expect(defaultValue).toBe(workspaceDir);
+          return outputDir;
+        }
+        throw new Error(`Unexpected overwrite prompt: ${prompt}`);
+      },
+    });
+
+    expect(readFileSync(unrelatedPath, 'utf-8')).toBe(unrelatedContent);
+    expect(readFileSync(join(outputDir, 'prompt.yaml'), 'utf-8')).toContain('You are a template coding agent.');
+  });
+
+  it('should reject template-backed compose when output file path is a symlink', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    writeTemplateCompositionFixture(homeDir);
+
+    const outputDir = join(workspaceDir, 'templated-output');
+    mkdirSync(outputDir, { recursive: true });
+    const outsideTargetPath = join(workspaceDir, 'outside-template-target.yaml');
+    writeFileSync(outsideTargetPath, 'outside', 'utf-8');
+    symlinkSync(outsideTargetPath, join(outputDir, 'prompt.yaml'));
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli(['compose'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['templated (global)']),
+      input: async (prompt, defaultValue) => {
+        if (prompt === 'Output directory') {
+          expect(defaultValue).toBe(workspaceDir);
+          return outputDir;
+        }
+        expect(prompt).toContain('Output files exist. Overwrite?');
+        expect(prompt).toContain('[y/N]');
+        return 'y';
+      },
+    })).rejects.toThrow(`Symbolic links are not allowed for output file: ${join(outputDir, 'prompt.yaml')}`);
+
+    expect(readFileSync(outsideTargetPath, 'utf-8')).toBe('outside');
+  });
+
+  it('should reject template-backed compose when output directory path is a symlink', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    writeTemplateCompositionFixture(homeDir);
+
+    const realOutputDir = join(workspaceDir, 'templated-output-real');
+    const outputDirSymlink = join(workspaceDir, 'templated-output-link');
+    mkdirSync(realOutputDir, { recursive: true });
+    symlinkSync(realOutputDir, outputDirSymlink);
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli(['compose'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['templated (global)']),
+      input: async (prompt, defaultValue) => {
+        if (prompt === 'Output directory') {
+          expect(defaultValue).toBe(workspaceDir);
+          return outputDirSymlink;
+        }
+        throw new Error(`Unexpected prompt: ${prompt}`);
+      },
+    })).rejects.toThrow(`Symbolic links are not allowed for Output directory: ${outputDirSymlink}`);
+  });
+
+  it('should reject template-backed compose when output directory symlink is outside cwd', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    const outsideRootDir = mkdtempSync(join(tmpdir(), 'facet-outside-'));
+    tempDirs.push(workspaceDir, homeDir, outsideRootDir);
+    writeTemplateCompositionFixture(homeDir);
+
+    const realOutputDir = join(outsideRootDir, 'templated-output-real');
+    const outputDirSymlink = join(outsideRootDir, 'templated-output-link');
+    mkdirSync(realOutputDir, { recursive: true });
+    symlinkSync(realOutputDir, outputDirSymlink);
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli(['compose'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['templated (global)']),
+      input: async (prompt, defaultValue) => {
+        if (prompt === 'Output directory') {
+          expect(defaultValue).toBe(workspaceDir);
+          return outputDirSymlink;
+        }
+        throw new Error(`Unexpected prompt: ${prompt}`);
+      },
+    })).rejects.toThrow(`Symbolic links are not allowed for Output directory: ${outputDirSymlink}`);
+  });
+
+  it('should reject template-backed compose when missing output directory has symlink ancestor outside cwd', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    const outsideRootDir = mkdtempSync(join(tmpdir(), 'facet-outside-'));
+    tempDirs.push(workspaceDir, homeDir, outsideRootDir);
+    writeTemplateCompositionFixture(homeDir);
+
+    const realOutputRootDir = join(outsideRootDir, 'templated-output-real');
+    const outputRootSymlink = join(outsideRootDir, 'templated-output-link');
+    const nestedOutputDir = join(outputRootSymlink, 'nested-output');
+    mkdirSync(realOutputRootDir, { recursive: true });
+    symlinkSync(realOutputRootDir, outputRootSymlink);
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli(['compose'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['templated (global)']),
+      input: async (prompt, defaultValue) => {
+        if (prompt === 'Output directory') {
+          expect(defaultValue).toBe(workspaceDir);
+          return nestedOutputDir;
+        }
+        throw new Error(`Unexpected prompt: ${prompt}`);
+      },
+    })).rejects.toThrow(`Symbolic links are not allowed in Output directory path: ${outputRootSymlink}`);
   });
 
   it('should cancel overwrite when output file exists and answer is not y/yes', async () => {
@@ -527,6 +774,61 @@ describe('facet compose integration flow', () => {
     }
     expect(result.path).toBe(outputPath);
     expect(readFileSync(outputPath, 'utf-8')).toContain('Never hide errors.');
+  });
+
+  it('should accept uppercase overwrite confirmation in both standard and template-backed compose', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    const { runFacetCli } = await loadCliModule();
+    await runInit(runFacetCli, workspaceDir, homeDir);
+    writeDefaultFacetFixture(homeDir);
+    writeTemplateCompositionFixture(homeDir);
+
+    const standardOutputDir = join(workspaceDir, 'standard-out');
+    mkdirSync(standardOutputDir, { recursive: true });
+    const standardOutputPath = join(standardOutputDir, 'coding.md');
+    writeFileSync(standardOutputPath, 'existing standard content', 'utf-8');
+
+    const standardResult = await runFacetCli(['compose'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['coding (global)', 'Combined (single file)']),
+      input: async (prompt) => {
+        if (prompt.startsWith('Output directory')) {
+          return standardOutputDir;
+        }
+        expect(prompt).toContain('Output file exists. Overwrite?');
+        return ' Y ';
+      },
+    });
+
+    expect(standardResult.kind).toBe('path');
+    expect(readFileSync(standardOutputPath, 'utf-8')).not.toBe('existing standard content');
+    expect(readFileSync(standardOutputPath, 'utf-8')).toContain('Do not add dead code.');
+
+    const templateOutputDir = join(workspaceDir, 'template-out');
+    mkdirSync(templateOutputDir, { recursive: true });
+    const templateRenderedPath = join(templateOutputDir, 'prompt.yaml');
+    writeFileSync(templateRenderedPath, 'existing template content', 'utf-8');
+
+    const templateResult = await runFacetCli(['compose'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['templated (global)']),
+      input: async (prompt, defaultValue) => {
+        if (prompt === 'Output directory') {
+          expect(defaultValue).toBe(workspaceDir);
+          return templateOutputDir;
+        }
+        expect(prompt).toContain('Output files exist. Overwrite?');
+        return ' Y ';
+      },
+    });
+
+    expect(templateResult.kind).toBe('path');
+    expect(readFileSync(templateRenderedPath, 'utf-8')).toContain('You are a template coding agent.');
   });
 
   it('should reject writing to a symlinked output file', async () => {

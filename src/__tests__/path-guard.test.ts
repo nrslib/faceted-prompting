@@ -63,4 +63,37 @@ describe('path guard', () => {
       `Symbolic links are not allowed in Output directory path: ${linkDir}`,
     );
   });
+
+  it('should reject symbolic-link path itself even when path is outside stopAtPath', () => {
+    const baseDir = mkdtempSync(join(tmpdir(), 'path-guard-stopat-'));
+    const outsideDir = mkdtempSync(join(tmpdir(), 'path-guard-outside-'));
+    tempDirs.push(baseDir, outsideDir);
+
+    const realDir = join(outsideDir, 'real');
+    const symlinkDir = join(outsideDir, 'link');
+    mkdirSync(realDir, { recursive: true });
+    symlinkSync(realDir, symlinkDir);
+
+    expect(() => ensurePathAncestorsContainNoSymbolicLinks(symlinkDir, 'Output directory', baseDir)).toThrow(
+      `Symbolic links are not allowed in Output directory path: ${symlinkDir}`,
+    );
+  });
+
+  it('should reject symbolic-link ancestor even when nearest existing ancestor is outside stopAtPath', () => {
+    const baseDir = mkdtempSync(join(tmpdir(), 'path-guard-stopat-'));
+    const outsideDir = mkdtempSync(join(tmpdir(), 'path-guard-outside-'));
+    tempDirs.push(baseDir, outsideDir);
+
+    const realDir = join(outsideDir, 'real');
+    const symlinkDir = join(outsideDir, 'link');
+    mkdirSync(realDir, { recursive: true });
+    symlinkSync(realDir, symlinkDir);
+
+    expect(() =>
+      ensurePathAncestorsContainNoSymbolicLinks(
+        join(symlinkDir, 'nested', 'child'),
+        'Output directory',
+        baseDir,
+      )).toThrow(`Symbolic links are not allowed in Output directory path: ${symlinkDir}`);
+  });
 });

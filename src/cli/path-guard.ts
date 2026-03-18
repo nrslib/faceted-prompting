@@ -44,6 +44,20 @@ export function ensurePathWithinRoots(path: string, roots: readonly string[], la
   throw new Error(`${label} must be inside allowed facets directory: ${realPath}`);
 }
 
+export function ensurePathIsNotSymbolicLink(path: string, label: string): string {
+  const resolvedPath = resolve(path);
+  if (!existsSync(resolvedPath)) {
+    return resolvedPath;
+  }
+
+  const stat = lstatSync(resolvedPath);
+  if (stat.isSymbolicLink()) {
+    throw new Error(`Symbolic links are not allowed for ${label}: ${resolvedPath}`);
+  }
+
+  return resolvedPath;
+}
+
 function findNearestExistingAncestor(path: string): string {
   let current = path;
   while (!existsSync(current)) {
@@ -63,25 +77,48 @@ export function ensurePathAncestorsContainNoSymbolicLinks(
 ): string {
   const resolvedPath = resolve(path);
   const resolvedStopAtPath = stopAtPath ? resolve(stopAtPath) : undefined;
+  const nearestExistingAncestor = findNearestExistingAncestor(resolvedPath);
 
   let current = resolvedPath;
   while (true) {
-    if (resolvedStopAtPath && !isWithinRoot(current, resolvedStopAtPath)) {
-      break;
-    }
-
     if (existsSync(current)) {
       const stat = lstatSync(current);
       if (stat.isSymbolicLink()) {
         throw new Error(`Symbolic links are not allowed in ${label} path: ${current}`);
       }
     }
+    if (current === nearestExistingAncestor) {
+      break;
+    }
 
     const parent = dirname(current);
     if (parent === current) {
       break;
     }
-    if (resolvedStopAtPath && current === resolvedStopAtPath) {
+    current = parent;
+  }
+
+  if (!resolvedStopAtPath || !isWithinRoot(nearestExistingAncestor, resolvedStopAtPath)) {
+    return resolvedPath;
+  }
+
+  current = dirname(nearestExistingAncestor);
+  while (true) {
+    if (existsSync(current)) {
+      const stat = lstatSync(current);
+      if (stat.isSymbolicLink()) {
+        throw new Error(`Symbolic links are not allowed in ${label} path: ${current}`);
+      }
+    }
+    if (current === resolvedStopAtPath) {
+      break;
+    }
+
+    const parent = dirname(current);
+    if (parent === current) {
+      break;
+    }
+    if (!isWithinRoot(parent, resolvedStopAtPath)) {
       break;
     }
     current = parent;

@@ -1,7 +1,19 @@
 import { basename, join } from 'node:path';
-import { copyFileSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import {
+  copyFileSync,
+  mkdirSync,
+  readdirSync,
+  realpathSync,
+  writeFileSync,
+} from 'node:fs';
 import type { buildSkillSections } from '../skill-renderer.js';
 import type { CopyFiles } from '../../types.js';
+import { isWithinRoot } from '../path-guard.js';
+import {
+  readUtf8FileWithoutFollowingSymbolicLinks,
+  resolveBoundedOutputFilePath,
+  writeUtf8FileWithoutFollowingSymbolicLinks,
+} from './facet-token-file-ops.js';
 
 const FACET_TOKEN_PATTERN = /{{facet:(persona|knowledges|policies|instructions)}}/g;
 const FACET_TOKEN_TEST = /{{facet:(persona|knowledges|policies|instructions)}}/;
@@ -59,6 +71,29 @@ function replaceFacetTokens(content: string, values: FacetTokenValues): string {
   return content.replaceAll(FACET_TOKEN_PATTERN, (_match, token: FacetPlaceholderKey) => {
     return values[token];
   });
+}
+
+function applyFacetTokensToSingleFile(params: {
+  filePath: string;
+  tokenValues: FacetTokenValues;
+  rootDir: string;
+}): void {
+  const boundedPath = resolveBoundedOutputFilePath(params.filePath, params.rootDir);
+  const original = readUtf8FileWithoutFollowingSymbolicLinks(boundedPath.filePath);
+  if (!FACET_TOKEN_TEST.test(original)) {
+    return;
+  }
+
+  const replaced = replaceFacetTokens(original, params.tokenValues);
+  if (replaced === original) {
+    return;
+  }
+
+  writeUtf8FileWithoutFollowingSymbolicLinks(boundedPath.filePath, replaced);
+  const outputRealPath = realpathSync(boundedPath.filePath);
+  if (!isWithinRoot(outputRealPath, boundedPath.rootRealPath)) {
+    throw new Error(`Output path escapes target directory: ${params.filePath}`);
+  }
 }
 
 export function buildSectionsWithCopiedPaths(
@@ -196,19 +231,29 @@ export function applyFacetTokensToPath(params: {
         continue;
       }
 
-      const original = readFileSync(entryPath, 'utf-8');
-      if (!FACET_TOKEN_TEST.test(original)) {
-        continue;
-      }
-
-      const replaced = replaceFacetTokens(original, tokenValues);
-      if (replaced !== original) {
-        writeFileSync(entryPath, replaced, 'utf-8');
-      }
+      applyFacetTokensToSingleFile({
+        filePath: entryPath,
+        tokenValues,
+        rootDir,
+      });
     }
   };
 
   visit(rootDir, 0);
+}
+
+export function applyFacetTokensToFiles(params: {
+  filePaths: readonly string[];
+  tokenValues: FacetTokenValues;
+  rootDir: string;
+}): void {
+  for (const filePath of params.filePaths) {
+    applyFacetTokensToSingleFile({
+      filePath,
+      tokenValues: params.tokenValues,
+      rootDir: params.rootDir,
+    });
+  }
 }
 
 export function parseScanDepth(rawDepth: string): number {

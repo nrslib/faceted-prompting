@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { compose } from '../compose.js';
 import { loadComposeDefinition } from '../compose-definition.js';
@@ -15,12 +15,13 @@ import {
 } from './skill-commands.js';
 import type { FacetCliOptions, FacetCliResult } from './types.js';
 import {
+  collectDirectoryFiles,
   copyDirectoryTree,
-  ensureRegenerationTargetDir,
   ensureTemplateDirectoryFromRoots,
   shouldOverwrite,
 } from './install-skill/flow.js';
-import { applyFacetTokensToPath, buildInlineFacetTokenValues } from './install-skill/facets.js';
+import { applyFacetTokensToFiles, buildInlineFacetTokenValues } from './install-skill/facets.js';
+import { ensurePathAncestorsContainNoSymbolicLinks, ensurePathIsNotSymbolicLink } from './path-guard.js';
 
 function buildComposeOutputPlans(params: {
   safeName: string;
@@ -52,6 +53,26 @@ function buildComposeOutputPlans(params: {
   ];
 }
 
+async function confirmOverwriteForExistingPaths(params: {
+  options: FacetCliOptions;
+  existingPaths: readonly string[];
+  promptMessage: string;
+  cancelMessage: string;
+}): Promise<boolean> {
+  if (params.existingPaths.length === 0) {
+    return false;
+  }
+
+  const overwriteAnswer = await params.options.input(
+    `${params.promptMessage} (${params.existingPaths.join(', ')}) [y/N]`,
+    'n',
+  );
+  if (!shouldOverwrite(overwriteAnswer)) {
+    throw new Error(`${params.cancelMessage}: ${params.existingPaths.join(', ')}`);
+  }
+  return true;
+}
+
 async function runTemplateBackedCompose(params: {
   options: FacetCliOptions;
   facetedRoots: readonly string[];
@@ -67,10 +88,18 @@ async function runTemplateBackedCompose(params: {
   const templateDir = ensureTemplateDirectoryFromRoots(params.facetedRoots, templateName);
   const outputInput = await params.options.input('Output directory', params.options.cwd);
   const outputDir = resolveOutputDirectory(outputInput, params.options.cwd);
-  await ensureRegenerationTargetDir({
-    targetDir: outputDir,
+
+  ensurePathIsNotSymbolicLink(outputDir, 'Output directory');
+  ensurePathAncestorsContainNoSymbolicLinks(outputDir, 'Output directory', params.options.cwd);
+  mkdirSync(outputDir, { recursive: true });
+
+  const templateRelativePaths = collectDirectoryFiles(templateDir);
+  const templateOutputPaths = templateRelativePaths.map(relativePath => resolve(outputDir, relativePath));
+  await confirmOverwriteForExistingPaths({
     options: params.options,
-    promptLabel: 'Output directory',
+    existingPaths: templateOutputPaths.filter(path => existsSync(path)),
+    promptMessage: 'Output files exist. Overwrite?',
+    cancelMessage: 'Output files exist and overwrite was cancelled',
   });
 
   copyDirectoryTree(templateDir, outputDir);
@@ -81,11 +110,10 @@ async function runTemplateBackedCompose(params: {
     facetsRoots: params.facetsRoots,
   });
 
-  applyFacetTokensToPath({
-    rootDir: outputDir,
-    maxDepth: Number.MAX_SAFE_INTEGER,
+  applyFacetTokensToFiles({
+    filePaths: templateOutputPaths.filter(path => existsSync(path)),
     tokenValues: buildInlineFacetTokenValues(sections),
-    excludeDirs: [],
+    rootDir: outputDir,
   });
 
   return {
@@ -129,17 +157,12 @@ async function runStandardCompose(params: {
   const existingPaths = outputPlans
     .map(plan => resolve(outputDir, plan.fileName))
     .filter(path => existsSync(path));
-  let overwrite = false;
-  if (existingPaths.length > 0) {
-    const overwriteAnswer = await params.options.input(
-      `Output file exists. Overwrite? (${existingPaths.join(', ')}) [y/N]`,
-      'n',
-    );
-    if (!shouldOverwrite(overwriteAnswer)) {
-      throw new Error(`Output file exists and overwrite was cancelled: ${existingPaths.join(', ')}`);
-    }
-    overwrite = true;
-  }
+  const overwrite = await confirmOverwriteForExistingPaths({
+    options: params.options,
+    existingPaths,
+    promptMessage: 'Output file exists. Overwrite?',
+    cancelMessage: 'Output file exists and overwrite was cancelled',
+  });
 
   const outputPaths: string[] = [];
   for (const plan of outputPlans) {
