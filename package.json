@@ -1,6 +1,6 @@
 {
   "name": "faceted-prompting",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Faceted Prompting — structured prompt composition for LLMs",
   "type": "module",
   "main": "dist/index.js",

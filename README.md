@@ -51,13 +51,13 @@ const result = compose(
     persona: { body: 'You are a senior TypeScript developer.' },
     policies: [{ body: 'Follow clean code principles. No any types.' }],
     knowledge: [{ body: 'The project uses Vitest for testing.' }],
-    instruction: { body: 'Implement a retry function with exponential backoff.' },
+    instructions: [{ body: 'Implement a retry function with exponential backoff.' }],
   },
   { contextMaxChars: 8000 },
 );
 
 // result.systemPrompt → "You are a senior TypeScript developer."
-// result.userMessage  → policies + knowledge + instruction (in order)
+// result.userMessage  → knowledge + instructions + policies (in order)
 ```
 
 ### As a CLI
@@ -88,6 +88,7 @@ facet install skill
 │   ├── persona/
 │   ├── knowledge/
 │   ├── policies/
+│   ├── instructions/
 │   └── compositions/
 └── templates/
 
@@ -97,6 +98,7 @@ facet install skill
 │   ├── persona/          # Persona Markdown files
 │   ├── knowledge/        # Domain knowledge files
 │   ├── policies/         # Policy/rules files
+│   ├── instructions/     # Instruction files
 │   └── compositions/     # Compose definition YAML files
 └── templates/            # Skill templates
 ```
@@ -125,16 +127,17 @@ knowledge:
   - architecture
 policies:
   - quality
-instruction: Summarize release impact.
+instructions:
+  - release-summary
 order:
   - knowledge
+  - instructions
   - policies
-  - instruction
 ```
 
 - `name` and `persona` are required.
-- `order` controls user-message section order (default: `policies` → `knowledge` → `instruction`).
-- `instruction` can be a facet file reference or inline text.
+- `order` controls user-message section order (default: `knowledge` → `instructions` → `policies`).
+- `instructions` is a list of facet file references.
 
 ## Scope References
 
@@ -201,6 +204,7 @@ See the [API Reference](./docs/api-reference.md) for the full API surface.
 │   ├── persona/
 │   ├── knowledge/
 │   ├── policies/
+│   ├── instructions/
 │   └── compositions/
 └── templates/
 
@@ -210,6 +214,7 @@ See the [API Reference](./docs/api-reference.md) for the full API surface.
 │   ├── persona/
 │   ├── knowledge/
 │   ├── policies/
+│   ├── instructions/
 │   └── compositions/
 ├── templates/                  # Skill install templates
 └── repertoire/                 # Installed repertoire packages
