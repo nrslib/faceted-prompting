@@ -1,4 +1,4 @@
-import { existsSync } from 'node:fs';
+import { existsSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 import { loadComposeDefinition } from '../compose-definition.js';
 import { getFacetedRoot } from '../config/index.js';
@@ -18,8 +18,10 @@ export function getSkillPaths(cwd: string, homeDir: string): {
 } {
   const globalFacetedRoot = getFacetedRoot(homeDir);
   const localFacetedRoot = getFacetedRoot(cwd);
-  const facetedRoots = existsSync(localFacetedRoot)
-    ? Array.from(new Set([localFacetedRoot, globalFacetedRoot]))
+  const realLocal = existsSync(localFacetedRoot) ? realpathSync(localFacetedRoot) : undefined;
+  const realGlobal = existsSync(globalFacetedRoot) ? realpathSync(globalFacetedRoot) : globalFacetedRoot;
+  const facetedRoots = realLocal && realLocal !== realGlobal
+    ? [localFacetedRoot, globalFacetedRoot]
     : [globalFacetedRoot];
 
   return {
@@ -33,10 +35,12 @@ function resolveCompositionSource(
   definitionPath: string,
   localCompositionsDir: string | undefined,
 ): 'local' | 'global' {
-  if (
-    localCompositionsDir &&
-    resolve(definitionPath).startsWith(`${resolve(localCompositionsDir)}${sep}`)
-  ) {
+  if (!localCompositionsDir) {
+    return 'global';
+  }
+  const realDefPath = existsSync(definitionPath) ? realpathSync(resolve(definitionPath)) : resolve(definitionPath);
+  const realLocalDir = existsSync(localCompositionsDir) ? realpathSync(resolve(localCompositionsDir)) : resolve(localCompositionsDir);
+  if (realDefPath.startsWith(`${realLocalDir}${sep}`)) {
     return 'local';
   }
 
