@@ -75,7 +75,7 @@ export async function runSkillDeployInstall(params: {
   }
 
   const templateDir = params.definition.template
-    ? ensureTemplateDirectoryFromRoots(params.facetedRoots, params.definition.template)
+    ? ensureTemplateDirectoryFromRoots(params.facetedRoots, params.definition.template, params.definitionDir)
     : undefined;
   const payload = composePromptPayload({
     definition: params.definition,

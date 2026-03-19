@@ -85,7 +85,7 @@ async function runTemplateBackedCompose(params: {
     throw new Error(`Template-backed compose requires template: ${params.definition.name}`);
   }
 
-  const templateDir = ensureTemplateDirectoryFromRoots(params.facetedRoots, templateName);
+  const templateDir = ensureTemplateDirectoryFromRoots(params.facetedRoots, templateName, dirname(params.definitionPath));
   const outputInput = await params.options.input('Output directory', params.options.cwd);
   const outputDir = resolveOutputDirectory(outputInput, params.options.cwd);
 

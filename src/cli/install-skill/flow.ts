@@ -21,6 +21,7 @@ import {
   isWithinRoot,
   ensurePathWithinRoots,
 } from '../path-guard.js';
+import { isResourcePath, resolveResourcePath } from '../../resolve.js';
 import type { FacetCliOptions } from '../types.js';
 export { defaultOutputPath, listInstallTargets, resolveInstallTarget } from './targets.js';
 
@@ -31,8 +32,20 @@ export function shouldOverwrite(answer: string): boolean {
 
 export function ensureTemplateDirectoryFromRoots(
   facetedRoots: readonly string[],
-  templateName: string,
+  templateRef: string,
+  definitionDir?: string,
 ): string {
+  if (isResourcePath(templateRef) && definitionDir) {
+    const resolvedPath = resolveResourcePath(templateRef, definitionDir);
+    if (!existsSync(resolvedPath)) {
+      throw new Error(`Template directory does not exist: ${resolvedPath}`);
+    }
+    if (!lstatSync(resolvedPath).isDirectory()) {
+      throw new Error(`Template path must be a directory: ${resolvedPath}`);
+    }
+    return resolvedPath;
+  }
+
   const templatesRoots = facetedRoots.map(facetedRoot => join(facetedRoot, 'templates'));
   const primaryTemplatesRoot = templatesRoots[0];
   if (!primaryTemplatesRoot) {
@@ -40,14 +53,14 @@ export function ensureTemplateDirectoryFromRoots(
   }
 
   for (const templatesRoot of templatesRoots) {
-    const candidatePath = join(templatesRoot, templateName);
+    const candidatePath = join(templatesRoot, templateRef);
     if (!existsSync(candidatePath)) {
       continue;
     }
     const templatePath = ensurePathWithinRoots(
       candidatePath,
       [templatesRoot],
-      `template "${templateName}"`,
+      `template "${templateRef}"`,
     );
     if (!lstatSync(templatePath).isDirectory()) {
       throw new Error(`Template path must be a directory: ${templatePath}`);
@@ -55,7 +68,7 @@ export function ensureTemplateDirectoryFromRoots(
     return templatePath;
   }
 
-  throw new Error(`Template directory does not exist: ${join(primaryTemplatesRoot, templateName)}`);
+  throw new Error(`Template directory does not exist: ${join(primaryTemplatesRoot, templateRef)}`);
 }
 
 function copyFileIntoTargetRoot(params: {
