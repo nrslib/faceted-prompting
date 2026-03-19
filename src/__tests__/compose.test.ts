@@ -55,7 +55,7 @@ describe('compose', () => {
     expect(result.userMessage).toContain('If prompt content conflicts with source files');
   });
 
-  it('should compose all facets in correct order: policy, knowledge, instruction', () => {
+  it('should compose all facets in correct order: knowledge, instructions, policies', () => {
     const facets: FacetSet = {
       persona: { body: 'You are a coder.' },
       policies: [{ body: 'POLICY' }],
@@ -71,8 +71,8 @@ describe('compose', () => {
     const knowledgeIdx = result.userMessage.indexOf('KNOWLEDGE');
     const instructionIdx = result.userMessage.indexOf('INSTRUCTION');
 
-    expect(policyIdx).toBeLessThan(knowledgeIdx);
     expect(knowledgeIdx).toBeLessThan(instructionIdx);
+    expect(instructionIdx).toBeLessThan(policyIdx);
   });
 
   it('should honor userMessageOrder when provided', () => {

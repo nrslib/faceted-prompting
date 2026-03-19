@@ -2,7 +2,7 @@
  * Facet composition — the core placement rule.
  *
  *   system prompt:  persona only    (WHO)
- *   user message:   policy + knowledge + instruction (HOW / WHAT TO KNOW / WHAT TO DO)
+ *   user message:   knowledge + instructions + policies (WHAT TO KNOW / WHAT TO DO / HOW)
  *
  * This module has ZERO dependencies on TAKT internals.
  */
@@ -15,13 +15,16 @@ import { prepareKnowledgeContent, preparePolicyContent } from './truncation.js';
  * placement rules.
  *
  * - persona → systemPrompt
- * - policy / knowledge / instruction → userMessage (in that order)
+ * - knowledge / instructions / policies → userMessage (in that order)
+ *
+ * Policies are placed last so they serve as the most recent constraint
+ * the model sees before generating output.
  */
 export function compose(facets: FacetSet, options: ComposeOptions): ComposedPrompt {
   const systemPrompt = facets.persona?.body ?? '';
 
   const userParts: string[] = [];
-  const order = options.userMessageOrder ?? ['policies', 'knowledge', 'instructions'];
+  const order = options.userMessageOrder ?? ['knowledge', 'instructions', 'policies'];
 
   for (const entry of order) {
     if (entry === 'policies') {
