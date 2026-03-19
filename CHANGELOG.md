@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-03-19
+
+### Changed
+- **BREAKING:** `instruction`（単数・文字列）を `instructions`（複数形・配列）に統一。compose 定義 YAML の `instruction: "..."` は `instructions: ["..."]` に変更が必要
+- デフォルトのユーザーメッセージ順序を `knowledge → instructions → policies` に変更。ポリシーが出力直前の制約として配置されるようになった
+- `template` フィールドでパス指定（`./`, `../`, `~`, `/`）に対応。テンプレートをプロジェクトローカルに配置可能に
+
+### Fixed
+- macOS の symlink パス不一致によりローカル composition が正しく検出されない問題を修正
+
 ## [0.3.0] - 2026-03-18
 
 ### Added
