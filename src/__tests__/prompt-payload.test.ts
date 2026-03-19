@@ -39,8 +39,8 @@ describe('composePromptPayload', () => {
         persona: 'coder',
         knowledge: ['architecture'],
         policies: ['coding'],
-        instruction: 'facets/instructions/task.md',
-        order: ['policies', 'knowledge', 'instruction'],
+        instructions: ['task'],
+        order: ['policies', 'knowledge', 'instructions'],
       },
       definitionDir: rootDir,
       facetsRoot,
@@ -61,19 +61,21 @@ describe('composePromptPayload', () => {
     });
   });
 
-  it('should omit literal instructions from copy-files', () => {
+  it('should resolve instruction name from facets/instructions directory', () => {
     const rootDir = mkdtempSync(join(tmpdir(), 'facet-payload-'));
     tempDirs.push(rootDir);
 
     const facetsRoot = join(rootDir, 'facets');
     mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
+    mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
     writeFileSync(join(facetsRoot, 'persona', 'coder.md'), 'You are a coding agent.', 'utf-8');
+    writeFileSync(join(facetsRoot, 'instructions', 'do-the-work.md'), 'Do the work.', 'utf-8');
 
     const payload = composePromptPayload({
       definition: {
         name: 'coding',
         persona: 'coder',
-        instruction: 'Do the work.',
+        instructions: ['do-the-work'],
       },
       definitionDir: rootDir,
       facetsRoot,
@@ -82,7 +84,7 @@ describe('composePromptPayload', () => {
       },
     });
 
-    expect(payload.copyFiles.instructions).toEqual([]);
+    expect(payload.copyFiles.instructions).toHaveLength(1);
     expect(payload.userPrompt).toContain('Do the work.');
   });
 });

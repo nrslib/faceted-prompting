@@ -23,7 +23,7 @@ export interface FacetPathMap {
   readonly persona: string;
   readonly knowledges: readonly string[];
   readonly policies: readonly string[];
-  readonly instructions?: string;
+  readonly instructions: readonly string[];
 }
 
 function requireFacetPathCount(params: {
@@ -59,7 +59,7 @@ export function buildInlineFacetTokenValues(sections: SkillSections): FacetToken
     persona: sections.persona.body,
     knowledges: sections.knowledge.map(knowledge => knowledge.body).join('\n'),
     policies: sections.policies.map(policy => policy.body).join('\n'),
-    instructions: sections.instruction ? sections.instruction.body : '',
+    instructions: sections.instructions.map(instruction => instruction.body).join('\n'),
   };
 }
 
@@ -101,15 +101,6 @@ export function buildSectionsWithCopiedPaths(
     actual: facets.policies.length,
   });
 
-  const instruction =
-    sections.instruction && facets.instructions
-      ? {
-          ref: basename(facets.instructions, '.md'),
-          body: sections.instruction.body,
-          path: facets.instructions,
-        }
-      : sections.instruction;
-
   return {
     ...sections,
     persona: {
@@ -132,7 +123,17 @@ export function buildSectionsWithCopiedPaths(
         index,
       }),
     })),
-    instruction,
+    instructions: sections.instructions.map((instruction, index) => {
+      const instructionPath = facets.instructions[index];
+      if (instructionPath) {
+        return {
+          ref: basename(instructionPath, '.md'),
+          body: instruction.body,
+          path: instructionPath,
+        };
+      }
+      return instruction;
+    }),
   };
 }
 
@@ -140,7 +141,7 @@ export function copyFacetFiles(params: {
   targetDir: string;
   safeSkillName: string;
   copyFiles: CopyFiles;
-  literalInstructionBody?: string;
+  literalInstructionBodies?: readonly string[];
 }): FacetPathMap {
   const facetsDir = join(params.targetDir, 'facets');
   const personaDir = join(facetsDir, 'persona');
@@ -171,16 +172,25 @@ export function copyFacetFiles(params: {
     return targetPath;
   });
 
-  let instructionPath: string | undefined;
-  const sourceInstructionPath = params.copyFiles.instructions[0];
-  if (sourceInstructionPath || params.literalInstructionBody) {
+  const instructionPaths: string[] = [];
+  const hasSourceInstructions = params.copyFiles.instructions.length > 0;
+  const hasLiteralInstructions = params.literalInstructionBodies && params.literalInstructionBodies.length > 0;
+
+  if (hasSourceInstructions || hasLiteralInstructions) {
     mkdirSync(instructionsDir, { recursive: true });
-    if (sourceInstructionPath) {
-      instructionPath = join(instructionsDir, basename(sourceInstructionPath));
-      copyFileSync(sourceInstructionPath, instructionPath);
-    } else {
-      instructionPath = join(instructionsDir, `${params.safeSkillName}.md`);
-      writeFileSync(instructionPath, normalizeInstructionBody(params.literalInstructionBody ?? ''), 'utf-8');
+    if (hasSourceInstructions) {
+      for (const sourceInstructionPath of params.copyFiles.instructions) {
+        const targetPath = join(instructionsDir, basename(sourceInstructionPath));
+        copyFileSync(sourceInstructionPath, targetPath);
+        instructionPaths.push(targetPath);
+      }
+    } else if (params.literalInstructionBodies) {
+      for (let i = 0; i < params.literalInstructionBodies.length; i++) {
+        const suffix = params.literalInstructionBodies.length === 1 ? '' : `-${i + 1}`;
+        const targetPath = join(instructionsDir, `${params.safeSkillName}${suffix}.md`);
+        writeFileSync(targetPath, normalizeInstructionBody(params.literalInstructionBodies[i] ?? ''), 'utf-8');
+        instructionPaths.push(targetPath);
+      }
     }
   }
 
@@ -188,7 +198,7 @@ export function copyFacetFiles(params: {
     persona: personaPath,
     knowledges: knowledgePaths,
     policies: policyPaths,
-    instructions: instructionPath,
+    instructions: instructionPaths,
   };
 }
 

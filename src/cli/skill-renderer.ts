@@ -109,28 +109,17 @@ export function resolveDefinitionSections(params: {
       return { ref, body: resolved.body, path: resolved.path };
     }) ?? [];
 
-  let instruction: InstructionSection | undefined;
-  if (definition.instruction) {
-    if (isResourcePath(definition.instruction)) {
+  const instructions: InstructionSection[] =
+    definition.instructions?.map(ref => {
       const resolved = resolveFacetRefContent({
-        ref: definition.instruction,
-        label: 'instruction file',
+        ref,
+        label: `instruction facet "${ref}"`,
         baseDir: definitionDir,
-        facetDirs: facetsRoots,
+        facetDirs: facetsRoots.map(facetsRoot => join(facetsRoot, 'instructions')),
         allowedRoots,
       });
-      instruction = {
-        ref: definition.instruction,
-        body: resolved.body,
-        path: resolved.path,
-      };
-    } else {
-      instruction = {
-        ref: 'literal',
-        body: definition.instruction,
-      };
-    }
-  }
+      return { ref, body: resolved.body, path: resolved.path };
+    }) ?? [];
 
   return {
     persona: {
@@ -140,7 +129,7 @@ export function resolveDefinitionSections(params: {
     },
     policies,
     knowledge,
-    instruction,
+    instructions,
   };
 }
 
@@ -187,11 +176,11 @@ export function buildFacetSet(params: {
     persona: { body: resolved.persona.body, sourcePath: resolved.persona.path },
     policies: resolved.policies.map(policy => ({ body: policy.body, sourcePath: policy.path })),
     knowledge: resolved.knowledge.map(item => ({ body: item.body, sourcePath: item.path })),
-    instruction: resolved.instruction
-      ? ('path' in resolved.instruction
-          ? { body: resolved.instruction.body, sourcePath: resolved.instruction.path }
-          : { body: resolved.instruction.body })
-      : undefined,
+    instructions: resolved.instructions.map(instruction =>
+      'path' in instruction
+        ? { body: instruction.body, sourcePath: instruction.path }
+        : { body: instruction.body },
+    ),
   };
 }
 
@@ -209,7 +198,7 @@ export function buildSkillSections(params: {
     persona: resolved.persona,
     policies: resolved.policies,
     knowledge: resolved.knowledge,
-    instruction: resolved.instruction,
+    instructions: resolved.instructions,
   };
 }
 
@@ -269,16 +258,19 @@ export function renderSkillDocument(input: SkillDocumentInput): string {
     }
   }
 
-  if (input.instruction) {
-    lines.push('## Instruction');
+  if (input.instructions.length > 0) {
+    lines.push('## Instructions');
     lines.push('');
-
-    if (input.mode === 'reference' && hasInstructionPath(input.instruction)) {
-      lines.push(input.instruction.path);
-    } else {
-      lines.push(input.instruction.body);
+    for (const instruction of input.instructions) {
+      if (input.mode === 'reference' && hasInstructionPath(instruction)) {
+        lines.push(`### ${instruction.ref}`);
+        lines.push('');
+        lines.push(instruction.path);
+      } else {
+        lines.push(instruction.body);
+      }
+      lines.push('');
     }
-    lines.push('');
   }
 
   return `${lines.join('\n').trimEnd()}\n`;

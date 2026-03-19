@@ -102,10 +102,10 @@ export async function runSkillDeployInstall(params: {
       targetDir,
       safeSkillName: params.safeSkillName,
       copyFiles: payload.copyFiles,
-      literalInstructionBody:
-        params.sections.instruction && !('path' in params.sections.instruction)
-          ? params.sections.instruction.body
-          : undefined,
+      literalInstructionBodies:
+        params.sections.instructions
+          .filter(instruction => !('path' in instruction))
+          .map(instruction => instruction.body),
     });
 
     applyFacetTokensToPath({
@@ -125,10 +125,10 @@ export async function runSkillDeployInstall(params: {
       targetDir,
       safeSkillName: params.safeSkillName,
       copyFiles: payload.copyFiles,
-      literalInstructionBody:
-        params.sections.instruction && !('path' in params.sections.instruction)
-          ? params.sections.instruction.body
-          : undefined,
+      literalInstructionBodies:
+        params.sections.instructions
+          .filter(instruction => !('path' in instruction))
+          .map(instruction => instruction.body),
     });
 
     const content = renderSkillDocument({

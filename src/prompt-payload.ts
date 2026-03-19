@@ -14,8 +14,9 @@ function buildCopyFiles(params: {
     persona: [resolved.persona.path],
     knowledge: resolved.knowledge.map(section => section.path),
     policies: resolved.policies.map(section => section.path),
-    instructions:
-      resolved.instruction && 'path' in resolved.instruction ? [resolved.instruction.path] : [],
+    instructions: resolved.instructions
+      .filter((instruction): instruction is { ref: string; body: string; path: string } => 'path' in instruction)
+      .map(instruction => instruction.path),
   };
 }
 

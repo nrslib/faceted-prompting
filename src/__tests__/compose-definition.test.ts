@@ -12,8 +12,8 @@ type ComposeDefinitionModule = {
     template?: string;
     knowledge?: string[];
     policies?: string[];
-    instruction?: string;
-    order?: Array<'knowledge' | 'policies' | 'instruction'>;
+    instructions?: string[];
+    order?: Array<'knowledge' | 'policies' | 'instructions'>;
   }>;
 };
 
@@ -74,12 +74,13 @@ describe('loadComposeDefinition', () => {
         '  - architecture',
         'policies:',
         '  - quality',
-        'instruction: Prepare release notes.',
+        'instructions:',
+        '  - Prepare release notes.',
         'order:',
         '  - persona',
         '  - policies',
         '  - knowledge',
-        '  - instruction',
+        '  - instructions',
       ].join('\n'),
       'utf-8',
     );
@@ -89,10 +90,11 @@ describe('loadComposeDefinition', () => {
     expect(loaded.name).toBe('release-note');
     expect(loaded.description).toBeUndefined();
     expect(loaded.persona).toBe('coder');
-    expect(loaded.order).toEqual(['policies', 'knowledge', 'instruction']);
+    expect(loaded.instructions).toEqual(['Prepare release notes.']);
+    expect(loaded.order).toEqual(['policies', 'knowledge', 'instructions']);
   });
 
-  it('should parse YAML block scalar instruction', async () => {
+  it('should parse instructions as list', async () => {
     const root = mkdtempSync(join(tmpdir(), 'facet-compose-def-'));
     tempDirs.push(root);
 
@@ -100,19 +102,18 @@ describe('loadComposeDefinition', () => {
     writeFileSync(
       definitionPath,
       [
-        'name: block-scalar',
+        'name: multi-instructions',
         'persona: coder',
-        'instruction: |',
-        '  Keep implementation simple.',
-        '  Avoid fallback defaults.',
+        'instructions:',
+        '  - generation-steps',
+        '  - self-check',
       ].join('\n'),
       'utf-8',
     );
 
     const { loadComposeDefinition } = await loadComposeDefinitionModule();
     const loaded = await loadComposeDefinition(definitionPath);
-    expect(loaded.instruction).toContain('Keep implementation simple.');
-    expect(loaded.instruction).toContain('Avoid fallback defaults.');
+    expect(loaded.instructions).toEqual(['generation-steps', 'self-check']);
   });
 
   it('should parse optional template field', async () => {

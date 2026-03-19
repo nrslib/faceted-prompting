@@ -22,12 +22,12 @@ export interface SkillDocumentInput {
   readonly persona: SkillSection;
   readonly policies: readonly SkillSection[];
   readonly knowledge: readonly SkillSection[];
-  readonly instruction?: InstructionSection;
+  readonly instructions: readonly InstructionSection[];
 }
 
 export interface ResolvedDefinitionSections {
   readonly persona: SkillSection;
   readonly policies: readonly SkillSection[];
   readonly knowledge: readonly SkillSection[];
-  readonly instruction?: InstructionSection;
+  readonly instructions: readonly InstructionSection[];
 }

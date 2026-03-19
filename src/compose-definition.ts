@@ -9,11 +9,11 @@ const ALLOWED_COMPOSE_KEYS = new Set([
   'template',
   'knowledge',
   'policies',
-  'instruction',
+  'instructions',
   'order',
 ]);
 
-const ORDER_VALUES = new Set(['persona', 'knowledge', 'policies', 'instruction']);
+const ORDER_VALUES = new Set(['persona', 'knowledge', 'policies', 'instructions']);
 
 function normalizeOrder(rawOrder: string[] | undefined): ComposeOrderEntry[] | undefined {
   if (!rawOrder) return undefined;
@@ -79,6 +79,13 @@ function toOptionalNonEmpty(value: string | undefined): string | undefined {
   return trimmed.length > 0 ? trimmed : undefined;
 }
 
+function normalizeInstructions(parsed: Record<string, unknown>): string[] | undefined {
+  if (parsed.instructions !== undefined) {
+    return ensureStringList(parsed.instructions, 'instructions');
+  }
+  return undefined;
+}
+
 export async function loadComposeDefinition(definitionPath: string): Promise<ComposeDefinition> {
   const rawYaml = readFileSync(definitionPath, 'utf-8');
   const parsed = parseComposeDefinitionYaml(rawYaml);
@@ -87,7 +94,7 @@ export async function loadComposeDefinition(definitionPath: string): Promise<Com
   const persona = ensureRequiredString(parsed.persona, 'persona');
   const description = ensureOptionalString(parsed.description, 'description');
   const template = ensureOptionalString(parsed.template, 'template');
-  const instruction = ensureOptionalString(parsed.instruction, 'instruction');
+  const instructions = normalizeInstructions(parsed);
 
   const knowledge = ensureStringList(parsed.knowledge, 'knowledge');
   const policies = ensureStringList(parsed.policies, 'policies');
@@ -101,7 +108,7 @@ export async function loadComposeDefinition(definitionPath: string): Promise<Com
     template: toOptionalNonEmpty(template),
     knowledge: knowledge && knowledge.length > 0 ? knowledge : undefined,
     policies: policies && policies.length > 0 ? policies : undefined,
-    instruction: toOptionalNonEmpty(instruction),
+    instructions: instructions && instructions.length > 0 ? instructions : undefined,
     order,
   };
 }

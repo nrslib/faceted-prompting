@@ -22,7 +22,7 @@ describe('compose', () => {
 
   it('should place instruction in userMessage', () => {
     const facets: FacetSet = {
-      instruction: { body: 'Implement feature X.' },
+      instructions: [{ body: 'Implement feature X.' }],
     };
 
     const result = compose(facets, defaultOptions);
@@ -60,7 +60,7 @@ describe('compose', () => {
       persona: { body: 'You are a coder.' },
       policies: [{ body: 'POLICY' }],
       knowledge: [{ body: 'KNOWLEDGE' }],
-      instruction: { body: 'INSTRUCTION' },
+      instructions: [{ body: 'INSTRUCTION' }],
     };
 
     const result = compose(facets, defaultOptions);
@@ -79,12 +79,12 @@ describe('compose', () => {
     const facets: FacetSet = {
       policies: [{ body: 'POLICY' }],
       knowledge: [{ body: 'KNOWLEDGE' }],
-      instruction: { body: 'INSTRUCTION' },
+      instructions: [{ body: 'INSTRUCTION' }],
     };
 
     const result = compose(facets, {
       contextMaxChars: 2000,
-      userMessageOrder: ['knowledge', 'policies', 'instruction'],
+      userMessageOrder: ['knowledge', 'policies', 'instructions'],
     });
 
     const knowledgeIdx = result.userMessage.indexOf('KNOWLEDGE');

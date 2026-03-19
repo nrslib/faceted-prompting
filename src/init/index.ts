@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { ensureConfigFile, getFacetedRoot } from '../config/index.js';
 
-const REQUIRED_FACET_DIRS = ['persona', 'knowledge', 'policies', 'output-contracts'] as const;
+const REQUIRED_FACET_DIRS = ['persona', 'knowledge', 'policies', 'instructions', 'output-contracts'] as const;
 const TAKT_BOOTSTRAP_BASE_URL = 'https://raw.githubusercontent.com/nrslib/takt/main/builtins/ja/facets';
 
 function makeComposition(name: string, description: string, knowledge: readonly string[]): string {
@@ -43,8 +43,8 @@ const DEFAULT_COMPOSITIONS: ReadonlyArray<{ relativePath: string; content: strin
       '  - ai-antipattern',
       'knowledge:',
       '  - architecture',
-      'instruction: |',
-      '  Confirm the issue scope before editing, keep the change minimal, and report build/test results.',
+      'instructions:',
+      '  - issue-worktree',
       'template: issue-worktree',
       '',
     ].join('\n'),
@@ -113,6 +113,10 @@ const DEFAULT_TEMPLATES: ReadonlyArray<{ relativePath: string; content: string }
       '- Check for hidden fallback logic.',
       '',
     ].join('\n'),
+  },
+  {
+    relativePath: 'facets/instructions/issue-worktree.md',
+    content: 'Confirm the issue scope before editing, keep the change minimal, and report build/test results.\n',
   },
   ...DEFAULT_COMPOSITIONS,
 ];

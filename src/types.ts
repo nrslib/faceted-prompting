@@ -32,7 +32,7 @@ export interface FacetSet {
   readonly persona?: FacetContent;
   readonly policies?: readonly FacetContent[];
   readonly knowledge?: readonly FacetContent[];
-  readonly instruction?: FacetContent;
+  readonly instructions?: readonly FacetContent[];
 }
 
 /**
@@ -60,7 +60,7 @@ export interface ComposedPromptPayload {
 }
 
 /** User-message sections that can be ordered in compose definitions. */
-export type ComposeOrderEntry = 'policies' | 'knowledge' | 'instruction';
+export type ComposeOrderEntry = 'policies' | 'knowledge' | 'instructions';
 
 /** CLI compose definition loaded from YAML. */
 export interface ComposeDefinition {
@@ -70,7 +70,7 @@ export interface ComposeDefinition {
   readonly template?: string;
   readonly knowledge?: readonly string[];
   readonly policies?: readonly string[];
-  readonly instruction?: string;
+  readonly instructions?: readonly string[];
   readonly order?: readonly ComposeOrderEntry[];
 }
 

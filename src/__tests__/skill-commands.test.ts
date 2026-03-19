@@ -29,10 +29,12 @@ function createSections(): Omit<SkillDocumentInput, 'mode'> {
         path: '/original/facets/policies/coding.md',
       },
     ],
-    instruction: {
-      ref: 'literal',
-      body: 'Keep changes small and explicit.',
-    },
+    instructions: [
+      {
+        ref: 'literal',
+        body: 'Keep changes small and explicit.',
+      },
+    ],
   };
 }
 
@@ -45,7 +47,7 @@ describe('buildSectionsWithCopiedPaths', () => {
         persona: '/target/facets/persona/coder.md',
         knowledges: [],
         policies: ['/target/facets/policies/coding.md'],
-        instructions: '/target/facets/instructions/plain-skill.md',
+        instructions: ['/target/facets/instructions/plain-skill.md'],
       }),
     ).toThrow('Copied knowledge facet count mismatch');
   });
@@ -58,7 +60,7 @@ describe('buildSectionsWithCopiedPaths', () => {
         persona: '/target/facets/persona/coder.md',
         knowledges: ['/target/facets/knowledge/architecture.md'],
         policies: [],
-        instructions: '/target/facets/instructions/plain-skill.md',
+        instructions: ['/target/facets/instructions/plain-skill.md'],
       }),
     ).toThrow('Copied policy facet count mismatch');
   });

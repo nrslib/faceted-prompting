@@ -50,6 +50,7 @@ function createFacetedFixture(homeDir: string): void {
   mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
   mkdirSync(join(facetsRoot, 'knowledge'), { recursive: true });
   mkdirSync(join(facetsRoot, 'policies'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
   mkdirSync(compositionsRoot, { recursive: true });
   mkdirSync(templatesRoot, { recursive: true });
 
@@ -57,6 +58,7 @@ function createFacetedFixture(homeDir: string): void {
   writeFileSync(join(facetsRoot, 'persona', 'coder.md'), 'You are a coding agent.', 'utf-8');
   writeFileSync(join(facetsRoot, 'knowledge', 'architecture.md'), 'Architecture reference.', 'utf-8');
   writeFileSync(join(facetsRoot, 'policies', 'coding.md'), 'Never hide errors.', 'utf-8');
+  writeFileSync(join(facetsRoot, 'instructions', 'keep-changes-small.md'), 'Keep changes small and explicit.', 'utf-8');
 
   writeFileSync(
     join(compositionsRoot, 'templated.yaml'),
@@ -67,7 +69,8 @@ function createFacetedFixture(homeDir: string): void {
       '  - architecture',
       'policies:',
       '  - coding',
-      'instruction: Keep changes small and explicit.',
+      'instructions:',
+      '  - keep-changes-small',
       'template: starter-kit',
     ].join('\n'),
     'utf-8',

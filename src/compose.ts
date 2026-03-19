@@ -21,7 +21,7 @@ export function compose(facets: FacetSet, options: ComposeOptions): ComposedProm
   const systemPrompt = facets.persona?.body ?? '';
 
   const userParts: string[] = [];
-  const order = options.userMessageOrder ?? ['policies', 'knowledge', 'instruction'];
+  const order = options.userMessageOrder ?? ['policies', 'knowledge', 'instructions'];
 
   for (const entry of order) {
     if (entry === 'policies') {
@@ -48,8 +48,11 @@ export function compose(facets: FacetSet, options: ComposeOptions): ComposedProm
       continue;
     }
 
-    if (entry === 'instruction' && facets.instruction) {
-      userParts.push(facets.instruction.body);
+    if (entry === 'instructions') {
+      if (!facets.instructions || facets.instructions.length === 0) continue;
+      for (const instruction of facets.instructions) {
+        userParts.push(instruction.body);
+      }
     }
   }
 

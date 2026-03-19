@@ -56,7 +56,8 @@ function writeCodingComposition(compositionsRoot: string): void {
       '  - ai-antipattern',
       'knowledge:',
       '  - architecture',
-      'instruction: Keep changes small and explicit.',
+      'instructions:',
+      '  - keep-changes-small',
     ].join('\n'),
     'utf-8',
   );
@@ -70,12 +71,14 @@ function writeDefaultFacetFixture(homeDir: string, persona = 'You are a coding a
   mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
   mkdirSync(join(facetsRoot, 'knowledge'), { recursive: true });
   mkdirSync(join(facetsRoot, 'policies'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
   writeFileSync(join(facetsRoot, 'persona', 'coder.md'), persona, 'utf-8');
   writeFileSync(join(facetsRoot, 'knowledge', 'architecture.md'), 'Architecture reference.\n', 'utf-8');
   writeFileSync(join(facetsRoot, 'knowledge', 'frontend.md'), 'Frontend reference.\n', 'utf-8');
   writeFileSync(join(facetsRoot, 'knowledge', 'backend.md'), 'Backend reference.\n', 'utf-8');
   writeFileSync(join(facetsRoot, 'policies', 'coding.md'), 'Never hide errors.\n', 'utf-8');
   writeFileSync(join(facetsRoot, 'policies', 'ai-antipattern.md'), 'Do not add dead code.\n', 'utf-8');
+  writeFileSync(join(facetsRoot, 'instructions', 'keep-changes-small.md'), 'Keep changes small and explicit.\n', 'utf-8');
   writeCodingComposition(join(facetedRoot, 'compositions'));
 }
 
@@ -88,12 +91,14 @@ function writeFacetFilesUnderFacetedRoot(
     architecture: string;
     frontend: string;
     backend: string;
+    keepChangesSmall?: string;
   },
 ): void {
   const facetsRoot = join(facetedRoot, 'facets');
   mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
   mkdirSync(join(facetsRoot, 'knowledge'), { recursive: true });
   mkdirSync(join(facetsRoot, 'policies'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
   writeFileSync(join(facetedRoot, 'config.yaml'), 'version: 1\n', 'utf-8');
   writeFileSync(join(facetsRoot, 'persona', 'coder.md'), contents.persona, 'utf-8');
   writeFileSync(join(facetsRoot, 'knowledge', 'architecture.md'), contents.architecture, 'utf-8');
@@ -101,6 +106,7 @@ function writeFacetFilesUnderFacetedRoot(
   writeFileSync(join(facetsRoot, 'knowledge', 'backend.md'), contents.backend, 'utf-8');
   writeFileSync(join(facetsRoot, 'policies', 'coding.md'), contents.codingPolicy, 'utf-8');
   writeFileSync(join(facetsRoot, 'policies', 'ai-antipattern.md'), contents.aiAntipatternPolicy, 'utf-8');
+  writeFileSync(join(facetsRoot, 'instructions', 'keep-changes-small.md'), contents.keepChangesSmall ?? 'Keep changes small and explicit.\n', 'utf-8');
   writeCodingComposition(join(facetedRoot, 'compositions'));
 }
 
@@ -113,6 +119,7 @@ function writeTemplateCompositionFixture(homeDir: string): void {
   mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
   mkdirSync(join(facetsRoot, 'knowledge'), { recursive: true });
   mkdirSync(join(facetsRoot, 'policies'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
   mkdirSync(compositionsRoot, { recursive: true });
   mkdirSync(templateRoot, { recursive: true });
 
@@ -120,6 +127,7 @@ function writeTemplateCompositionFixture(homeDir: string): void {
   writeFileSync(join(facetsRoot, 'persona', 'coder.md'), 'You are a template coding agent.', 'utf-8');
   writeFileSync(join(facetsRoot, 'knowledge', 'architecture.md'), 'Template architecture knowledge.', 'utf-8');
   writeFileSync(join(facetsRoot, 'policies', 'coding.md'), 'Template coding policy.', 'utf-8');
+  writeFileSync(join(facetsRoot, 'instructions', 'keep-deterministic.md'), 'Keep template output deterministic.', 'utf-8');
 
   writeFileSync(
     join(compositionsRoot, 'templated.yaml'),
@@ -130,7 +138,8 @@ function writeTemplateCompositionFixture(homeDir: string): void {
       '  - architecture',
       'policies:',
       '  - coding',
-      'instruction: Keep template output deterministic.',
+      'instructions:',
+      '  - keep-deterministic',
       'template: starter-kit',
     ].join('\n'),
     'utf-8',

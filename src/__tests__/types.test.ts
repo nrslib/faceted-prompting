@@ -51,7 +51,7 @@ describe('FacetSet interface', () => {
       persona: { body: 'You are a coder.' },
       policies: [{ body: 'Follow clean code.' }],
       knowledge: [{ body: 'Architecture docs.' }],
-      instruction: { body: 'Implement the feature.' },
+      instructions: [{ body: 'Implement the feature.' }],
     };
     expect(set.persona?.body).toBe('You are a coder.');
     expect(set.policies).toHaveLength(1);
@@ -59,10 +59,10 @@ describe('FacetSet interface', () => {
 
   it('should accept a partial facet set', () => {
     const set: FacetSet = {
-      instruction: { body: 'Do the task.' },
+      instructions: [{ body: 'Do the task.' }],
     };
     expect(set.persona).toBeUndefined();
-    expect(set.instruction?.body).toBe('Do the task.');
+    expect(set.instructions?.[0]?.body).toBe('Do the task.');
   });
 });
 
