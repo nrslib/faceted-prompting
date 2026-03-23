@@ -43,6 +43,14 @@ function createSelectStub(expectedSelections: readonly string[]) {
   };
 }
 
+async function unexpectedSelect(candidates: string[]): Promise<string> {
+  throw new Error(`Unexpected select call: ${candidates.join(', ')}`);
+}
+
+async function unexpectedInput(prompt: string): Promise<string> {
+  throw new Error(`Unexpected input call: ${prompt}`);
+}
+
 function writeCodingComposition(compositionsRoot: string): void {
   mkdirSync(compositionsRoot, { recursive: true });
   writeFileSync(
@@ -207,6 +215,159 @@ describe('facet compose integration flow', () => {
     expect(generated).toContain('Keep changes small and explicit.');
   });
 
+  it('should compose standard output non-interactively with combined output file', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeDefaultFacetFixture(homeDir, 'You are a release engineer.\n');
+
+    const outputDir = join(workspaceDir, 'out');
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli([
+      'compose',
+      '--composition',
+      'coding',
+      '--combined',
+      '--output',
+      outputDir,
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    });
+
+    expect(result.kind).toBe('path');
+    if (result.kind !== 'path') {
+      throw new Error('Expected path result for non-interactive compose command');
+    }
+    expect(result.path).toBe(join(outputDir, 'coding.md'));
+    expect(readFileSync(result.path, 'utf-8')).toContain('You are a release engineer.');
+  });
+
+  it('should compose standard output non-interactively to stdout in split mode', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeDefaultFacetFixture(homeDir, 'You are a release engineer.\n');
+
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli([
+      'compose',
+      '--composition',
+      'coding',
+      '--split',
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    });
+
+    expect(result.kind).toBe('text');
+    if (result.kind !== 'text') {
+      throw new Error('Expected text result for split stdout compose command');
+    }
+    expect(result.text).toContain('=== system ===');
+    expect(result.text).toContain('=== user ===');
+    expect(result.text).toContain('You are a release engineer.');
+    expect(result.text).toContain('Never hide errors.');
+  });
+
+  it('should compose standard output non-interactively to stdout in combined mode', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeDefaultFacetFixture(homeDir, 'You are a release engineer.\n');
+
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli([
+      'compose',
+      '--composition',
+      'coding',
+      '--combined',
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    });
+
+    expect(result.kind).toBe('text');
+    if (result.kind !== 'text') {
+      throw new Error('Expected text result for combined stdout compose command');
+    }
+    expect(result.text).toContain('You are a release engineer.');
+    expect(result.text).toContain('Architecture reference.');
+    expect(result.text).toContain('Never hide errors.');
+  });
+
+  it('should overwrite existing standard output file non-interactively when overwrite is enabled', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeDefaultFacetFixture(homeDir, 'You are a release engineer.\n');
+
+    const outputDir = join(workspaceDir, 'out');
+    mkdirSync(outputDir, { recursive: true });
+    const outputPath = join(outputDir, 'coding.md');
+    writeFileSync(outputPath, 'existing content', 'utf-8');
+
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli([
+      'compose',
+      '--composition',
+      'coding',
+      '--combined',
+      '--output',
+      outputDir,
+      '--overwrite',
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    });
+
+    expect(result.kind).toBe('path');
+    expect(readFileSync(outputPath, 'utf-8')).not.toBe('existing content');
+    expect(readFileSync(outputPath, 'utf-8')).toContain('Never hide errors.');
+  });
+
+  it('should reject overwriting existing standard output file non-interactively without overwrite', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeDefaultFacetFixture(homeDir, 'You are a release engineer.\n');
+
+    const outputDir = join(workspaceDir, 'out');
+    mkdirSync(outputDir, { recursive: true });
+    const outputPath = join(outputDir, 'coding.md');
+    writeFileSync(outputPath, 'existing content', 'utf-8');
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli([
+      'compose',
+      '--composition',
+      'coding',
+      '--combined',
+      '--output',
+      outputDir,
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    })).rejects.toThrow(`Output file exists and overwrite was cancelled: ${outputPath}`);
+
+    expect(readFileSync(outputPath, 'utf-8')).toBe('existing content');
+  });
+
   it('should prefer local composition and local facets while falling back to global facets', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
@@ -284,6 +445,69 @@ describe('facet compose integration flow', () => {
     expect(existsSync(join(workspaceDir, 'coding.md'))).toBe(false);
   });
 
+  it('should reject non-interactive compose when a local composition shadows a global definition', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeFacetFilesUnderFacetedRoot(join(homeDir, '.faceted'), {
+      persona: 'You are a global coder persona.\n',
+      codingPolicy: 'Global coding policy.\n',
+      aiAntipatternPolicy: 'Global AI antipattern policy.\n',
+      architecture: 'Global architecture knowledge.\n',
+      frontend: 'Global frontend knowledge.\n',
+      backend: 'Global backend knowledge.\n',
+    });
+
+    const localFacetedRoot = join(workspaceDir, '.faceted');
+    mkdirSync(join(localFacetedRoot, 'facets', 'persona'), { recursive: true });
+    mkdirSync(join(localFacetedRoot, 'facets', 'policies'), { recursive: true });
+    mkdirSync(join(localFacetedRoot, 'compositions'), { recursive: true });
+    writeFileSync(join(localFacetedRoot, 'facets', 'persona', 'coder.md'), 'You are a local coder persona.\n', 'utf-8');
+    writeFileSync(join(localFacetedRoot, 'facets', 'policies', 'coding.md'), 'Local coding policy.\n', 'utf-8');
+    writeCodingComposition(join(localFacetedRoot, 'compositions'));
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli([
+      'compose',
+      '--composition',
+      'coding',
+      '--combined',
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    })).rejects.toThrow('Non-interactive compose requires an unshadowed composition definition: coding');
+  });
+
+  it('should compose non-interactively when cwd matches home and only the global composition exists', async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(homeDir);
+
+    writeDefaultFacetFixture(homeDir, 'You are a home-scoped release engineer.\n');
+
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli([
+      'compose',
+      '--composition',
+      'coding',
+      '--combined',
+    ], {
+      cwd: homeDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    });
+
+    expect(result.kind).toBe('text');
+    if (result.kind !== 'text') {
+      throw new Error('Expected text result for home-scoped non-interactive compose command');
+    }
+    expect(result.text).toContain('You are a home-scoped release engineer.');
+    expect(result.text).toContain('Never hide errors.');
+  });
+
   it('should compose with local facets when global faceted home is not initialized', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
@@ -315,6 +539,124 @@ describe('facet compose integration flow', () => {
     expect(generated).toContain('You are a local-only coder persona.');
     expect(generated).toContain('Local-only coding policy.');
     expect(generated).toContain('Local-only architecture knowledge.');
+  });
+
+  it('should reject non-interactive standard compose without split or combined mode', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeDefaultFacetFixture(homeDir);
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli([
+      'compose',
+      '--composition',
+      'coding',
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    })).rejects.toThrow('Non-interactive standard compose requires --split or --combined');
+  });
+
+  it('should reject non-interactive compose when output-related options are provided without composition', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeDefaultFacetFixture(homeDir);
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli([
+      'compose',
+      '--output',
+      join(workspaceDir, 'out'),
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    })).rejects.toThrow('Non-interactive compose requires --composition');
+  });
+
+  it('should reject non-interactive compose when split mode is provided without composition', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeDefaultFacetFixture(homeDir);
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli([
+      'compose',
+      '--split',
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    })).rejects.toThrow('Non-interactive compose requires --composition');
+  });
+
+  it('should reject non-interactive compose when combined mode is provided without composition', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeDefaultFacetFixture(homeDir);
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli([
+      'compose',
+      '--combined',
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    })).rejects.toThrow('Non-interactive compose requires --composition');
+  });
+
+  it('should reject non-interactive compose when overwrite is provided without composition', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeDefaultFacetFixture(homeDir);
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli([
+      'compose',
+      '--overwrite',
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    })).rejects.toThrow('Non-interactive compose requires --composition');
+  });
+
+  it('should reject non-interactive compose when the named composition does not exist', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeDefaultFacetFixture(homeDir);
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli([
+      'compose',
+      '--composition',
+      'missing',
+      '--combined',
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    })).rejects.toThrow('Unknown compose definition: missing. Available compositions: coding');
   });
 
   it('should reject unsupported commands', async () => {
@@ -478,6 +820,211 @@ describe('facet compose integration flow', () => {
     expect(inputPrompts.some(prompt => prompt.includes('[y/N]'))).toBe(false);
   });
 
+  it('should compose template-backed output non-interactively to stdout', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    writeTemplateCompositionFixture(homeDir);
+
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli([
+      'compose',
+      '--composition',
+      'templated',
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    });
+
+    expect(result.kind).toBe('text');
+    if (result.kind !== 'text') {
+      throw new Error('Expected text result for template stdout compose command');
+    }
+    expect(result.text).toContain('--- prompt.yaml ---');
+    expect(result.text).toContain('--- README.md ---');
+    expect(result.text).toContain('You are a template coding agent.');
+    expect(result.text).toContain('template file');
+  });
+
+  it('should compose template-backed output non-interactively into files', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    writeTemplateCompositionFixture(homeDir);
+
+    const outputDir = join(workspaceDir, 'templated-output');
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli([
+      'compose',
+      '--composition',
+      'templated',
+      '--output',
+      outputDir,
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    });
+
+    expect(result.kind).toBe('path');
+    if (result.kind !== 'path') {
+      throw new Error('Expected path result for template output compose command');
+    }
+    expect(result.path).toBe(outputDir);
+    expect(readFileSync(join(outputDir, 'prompt.yaml'), 'utf-8')).toContain('You are a template coding agent.');
+    expect(readFileSync(join(outputDir, 'prompt.yaml'), 'utf-8')).toContain('Template coding policy.');
+    expect(readFileSync(join(outputDir, 'README.md'), 'utf-8')).toContain('template file');
+  });
+
+  it('should reject non-interactive template-backed compose when split mode is specified', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    writeTemplateCompositionFixture(homeDir);
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli([
+      'compose',
+      '--composition',
+      'templated',
+      '--split',
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    })).rejects.toThrow('Template-backed compose does not support --split or --combined');
+  });
+
+  it('should reject non-interactive template-backed compose when combined mode is specified', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    writeTemplateCompositionFixture(homeDir);
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli([
+      'compose',
+      '--composition',
+      'templated',
+      '--combined',
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    })).rejects.toThrow('Template-backed compose does not support --split or --combined');
+  });
+
+  it('should compose split output non-interactively into files', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeDefaultFacetFixture(homeDir, 'You are a release engineer.\n');
+
+    const outputDir = join(workspaceDir, 'out');
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli([
+      'compose',
+      '--composition',
+      'coding',
+      '--split',
+      '--output',
+      outputDir,
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    });
+
+    expect(result.kind).toBe('paths');
+    if (result.kind !== 'paths') {
+      throw new Error('Expected paths result for non-interactive split compose command');
+    }
+    expect(result.paths).toEqual([
+      join(outputDir, 'coding.system.md'),
+      join(outputDir, 'coding.user.md'),
+    ]);
+    expect(readFileSync(join(outputDir, 'coding.system.md'), 'utf-8')).toContain('You are a release engineer.');
+    expect(readFileSync(join(outputDir, 'coding.user.md'), 'utf-8')).toContain('Never hide errors.');
+  });
+
+  it('should reject overwriting existing split output files non-interactively without overwrite', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeDefaultFacetFixture(homeDir, 'You are a release engineer.\n');
+
+    const outputDir = join(workspaceDir, 'out');
+    mkdirSync(outputDir, { recursive: true });
+    const systemPath = join(outputDir, 'coding.system.md');
+    const userPath = join(outputDir, 'coding.user.md');
+    writeFileSync(systemPath, 'existing system content', 'utf-8');
+    writeFileSync(userPath, 'existing user content', 'utf-8');
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli([
+      'compose',
+      '--composition',
+      'coding',
+      '--split',
+      '--output',
+      outputDir,
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    })).rejects.toThrow(`Output file exists and overwrite was cancelled: ${systemPath}, ${userPath}`);
+
+    expect(readFileSync(systemPath, 'utf-8')).toBe('existing system content');
+    expect(readFileSync(userPath, 'utf-8')).toBe('existing user content');
+  });
+
+  it('should overwrite existing split output files non-interactively when overwrite is enabled', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeDefaultFacetFixture(homeDir, 'You are a release engineer.\n');
+
+    const outputDir = join(workspaceDir, 'out');
+    mkdirSync(outputDir, { recursive: true });
+    const systemPath = join(outputDir, 'coding.system.md');
+    const userPath = join(outputDir, 'coding.user.md');
+    writeFileSync(systemPath, 'existing system content', 'utf-8');
+    writeFileSync(userPath, 'existing user content', 'utf-8');
+
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli([
+      'compose',
+      '--composition',
+      'coding',
+      '--split',
+      '--output',
+      outputDir,
+      '--overwrite',
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    });
+
+    expect(result.kind).toBe('paths');
+    if (result.kind !== 'paths') {
+      throw new Error('Expected paths result for split overwrite compose command');
+    }
+    expect(readFileSync(systemPath, 'utf-8')).toContain('You are a release engineer.');
+    expect(readFileSync(userPath, 'utf-8')).toContain('Never hide errors.');
+  });
+
   it('should overwrite conflicting template-backed files only when answer is y/yes', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
@@ -509,6 +1056,68 @@ describe('facet compose integration flow', () => {
     expect(result.kind).toBe('path');
     if (result.kind !== 'path') {
       throw new Error('Expected path result for compose command');
+    }
+    expect(result.path).toBe(outputDir);
+    expect(readFileSync(renderedPath, 'utf-8')).toContain('You are a template coding agent.');
+  });
+
+  it('should reject overwriting conflicting template-backed files non-interactively without overwrite', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    writeTemplateCompositionFixture(homeDir);
+
+    const outputDir = join(workspaceDir, 'templated-output');
+    mkdirSync(outputDir, { recursive: true });
+    const renderedPath = join(outputDir, 'prompt.yaml');
+    writeFileSync(renderedPath, 'existing template output', 'utf-8');
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli([
+      'compose',
+      '--composition',
+      'templated',
+      '--output',
+      outputDir,
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    })).rejects.toThrow(`Output files exist and overwrite was cancelled: ${renderedPath}`);
+
+    expect(readFileSync(renderedPath, 'utf-8')).toBe('existing template output');
+  });
+
+  it('should overwrite conflicting template-backed files non-interactively when overwrite is enabled', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    writeTemplateCompositionFixture(homeDir);
+
+    const outputDir = join(workspaceDir, 'templated-output');
+    mkdirSync(outputDir, { recursive: true });
+    const renderedPath = join(outputDir, 'prompt.yaml');
+    writeFileSync(renderedPath, 'existing template output', 'utf-8');
+
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli([
+      'compose',
+      '--composition',
+      'templated',
+      '--output',
+      outputDir,
+      '--overwrite',
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    });
+
+    expect(result.kind).toBe('path');
+    if (result.kind !== 'path') {
+      throw new Error('Expected path result for template overwrite compose command');
     }
     expect(result.path).toBe(outputDir);
     expect(readFileSync(renderedPath, 'utf-8')).toContain('You are a template coding agent.');

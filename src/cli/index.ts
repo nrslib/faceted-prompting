@@ -9,6 +9,7 @@ import {
 import {
   runComposeCommand,
 } from './compose-command.js';
+import { parseComposeOptions } from './compose-options.js';
 import {
   runInstallSkillCommand,
 } from './skill-commands.js';
@@ -93,7 +94,7 @@ export async function runFacetCli(
   }
 
   if (command === 'compose') {
-    return runComposeCommand(options);
+    return runComposeCommand(options, parseComposeOptions(args.slice(1)));
   }
 
   if (command === 'install') {
