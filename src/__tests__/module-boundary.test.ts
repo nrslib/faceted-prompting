@@ -34,6 +34,23 @@ describe('module boundary', () => {
     expect('hasGlobalCompositionShadow' in skillCommandsModule).toBe(false);
   });
 
+  it('should expose only compose definition resolution entrypoint', async () => {
+    const resolutionModulePath = pathToFileURL(resolve('src/cli/compose-definition-resolution.ts')).href;
+    const resolutionModule = await import(resolutionModulePath);
+
+    expect(typeof resolutionModule.resolveComposeDefinition).toBe('function');
+    expect('validateNonInteractiveComposeOptions' in resolutionModule).toBe(false);
+  });
+
+  it('should require explicit compose options in compose execution entrypoints', () => {
+    const composeCommandSource = readFileSync(resolve('src/cli/compose-command.ts'), 'utf-8');
+    const composeExecutionSource = readFileSync(resolve('src/cli/compose-execution.ts'), 'utf-8');
+
+    expect(composeCommandSource).not.toContain('composeOptions: ComposeCliOptions = {}');
+    expect(composeExecutionSource).not.toContain('composeOptions?: ComposeCliOptions');
+    expect(composeExecutionSource).not.toContain('params.composeOptions ?? {}');
+  });
+
   it('should keep install facets orchestration file within size boundary', () => {
     const facetsModulePath = resolve('src/cli/install-skill/facets.ts');
     const lineCount = readFileSync(facetsModulePath, 'utf-8').split('\n').length;

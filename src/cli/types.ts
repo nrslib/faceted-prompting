@@ -5,6 +5,13 @@ export interface FacetCliOptions {
   readonly input: (prompt: string, defaultValue: string) => Promise<string>;
 }
 
+export interface ComposeCliOptions {
+  readonly composition?: string;
+  readonly outputMode?: 'split' | 'combined';
+  readonly output?: string;
+  readonly overwrite?: boolean;
+}
+
 export type FacetCliResult =
   | {
       readonly kind: 'path';

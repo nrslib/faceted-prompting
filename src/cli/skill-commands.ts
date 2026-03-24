@@ -15,6 +15,8 @@ export function getSkillPaths(cwd: string, homeDir: string): {
   readonly facetedRoots: readonly string[];
   readonly facetsRoots: readonly string[];
   readonly compositionsDirs: readonly string[];
+  readonly localCompositionsDir?: string;
+  readonly globalCompositionsDir: string;
 } {
   const globalFacetedRoot = getFacetedRoot(homeDir);
   const localFacetedRoot = getFacetedRoot(cwd);
@@ -23,11 +25,17 @@ export function getSkillPaths(cwd: string, homeDir: string): {
   const facetedRoots = realLocal && realLocal !== realGlobal
     ? [localFacetedRoot, globalFacetedRoot]
     : [globalFacetedRoot];
+  const localCompositionsDir = facetedRoots.length === 2
+    ? join(localFacetedRoot, 'compositions')
+    : undefined;
+  const globalCompositionsDir = join(globalFacetedRoot, 'compositions');
 
   return {
     facetedRoots,
     facetsRoots: facetedRoots.map(facetedRoot => join(facetedRoot, 'facets')),
     compositionsDirs: facetedRoots.map(facetedRoot => join(facetedRoot, 'compositions')),
+    localCompositionsDir,
+    globalCompositionsDir,
   };
 }
 
@@ -109,12 +117,34 @@ export async function selectCompositionDefinitionPath(params: {
   return { definitionPath };
 }
 
+export function resolveCompositionDefinitionPathByName(params: {
+  compositionName: string;
+  compositionDefinitionDirs: readonly string[];
+}): { definitionPath: string } {
+  const definitionMap = listCompositionDefinitions(params.compositionDefinitionDirs);
+  const definitionPath = definitionMap[params.compositionName];
+  if (definitionPath) {
+    return { definitionPath };
+  }
+
+  const availableNames = Object.keys(definitionMap).sort();
+  if (availableNames.length === 0) {
+    throw new Error(`No compose definitions found in ${params.compositionDefinitionDirs.join(', ')}`);
+  }
+
+  throw new Error(
+    `Unknown compose definition: ${params.compositionName}. Available compositions: ${availableNames.join(', ')}`,
+  );
+}
+
 export async function runInstallSkillCommand(options: FacetCliOptions): Promise<FacetCliResult> {
-  const { facetedRoots, facetsRoots, compositionsDirs } = getSkillPaths(options.cwd, options.homeDir);
-  const localFacetedRoot = getFacetedRoot(options.cwd);
-  const globalFacetedRoot = getFacetedRoot(options.homeDir);
-  const localCompositionsDir = existsSync(localFacetedRoot) ? join(localFacetedRoot, 'compositions') : undefined;
-  const globalCompositionsDir = join(globalFacetedRoot, 'compositions');
+  const {
+    facetedRoots,
+    facetsRoots,
+    compositionsDirs,
+    localCompositionsDir,
+    globalCompositionsDir,
+  } = getSkillPaths(options.cwd, options.homeDir);
 
   const { definitionPath } = await selectCompositionDefinitionPath({
     options,
