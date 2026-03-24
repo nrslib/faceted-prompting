@@ -497,16 +497,15 @@ describe('facet compose integration flow', () => {
       input: unexpectedInput,
     });
 
-    expect(result.kind).toBe('path');
-    if (result.kind !== 'path') {
-      throw new Error('Expected path result for non-interactive compose command');
+    expect(result.kind).toBe('text');
+    if (result.kind !== 'text') {
+      throw new Error('Expected text result for non-interactive compose command');
     }
 
-    const generated = readFileSync(result.path, 'utf-8');
-    expect(generated).toContain('You are a local coder persona.');
-    expect(generated).toContain('Local coding policy.');
-    expect(generated).toContain('Use the local composition definition.');
-    expect(generated).not.toContain('Keep changes small and explicit.');
+    expect(result.text).toContain('You are a local coder persona.');
+    expect(result.text).toContain('Local coding policy.');
+    expect(result.text).toContain('Use the local composition definition.');
+    expect(result.text).not.toContain('Keep changes small and explicit.');
   });
 
   it('should compose non-interactively when cwd matches home and only the global composition exists', async () => {
