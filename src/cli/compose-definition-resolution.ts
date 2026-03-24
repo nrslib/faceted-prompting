@@ -50,8 +50,6 @@ export async function resolveComposeDefinition(params: {
     ? resolveCompositionDefinitionPathByName({
       compositionName: requireCompositionName(params.composeOptions),
       compositionDefinitionDirs: compositionsDirs,
-      localCompositionsDir,
-      globalCompositionsDir,
     }).definitionPath
     : (await selectCompositionDefinitionPath({
       options: params.options,

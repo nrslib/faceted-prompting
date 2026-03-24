@@ -120,20 +120,10 @@ export async function selectCompositionDefinitionPath(params: {
 export function resolveCompositionDefinitionPathByName(params: {
   compositionName: string;
   compositionDefinitionDirs: readonly string[];
-  localCompositionsDir: string | undefined;
-  globalCompositionsDir: string;
 }): { definitionPath: string } {
   const definitionMap = listCompositionDefinitions(params.compositionDefinitionDirs);
   const definitionPath = definitionMap[params.compositionName];
   if (definitionPath) {
-    if (
-      resolveCompositionSource(definitionPath, params.localCompositionsDir) === 'local' &&
-      hasGlobalCompositionShadow(params.compositionName, params.globalCompositionsDir)
-    ) {
-      throw new Error(
-        `Non-interactive compose requires an unshadowed composition definition: ${params.compositionName}`,
-      );
-    }
     return { definitionPath };
   }
 

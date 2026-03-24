@@ -445,7 +445,7 @@ describe('facet compose integration flow', () => {
     expect(existsSync(join(workspaceDir, 'coding.md'))).toBe(false);
   });
 
-  it('should reject non-interactive compose when a local composition shadows a global definition', async () => {
+  it('should prefer the local composition definition for non-interactive compose when local shadows global', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
@@ -462,13 +462,30 @@ describe('facet compose integration flow', () => {
     const localFacetedRoot = join(workspaceDir, '.faceted');
     mkdirSync(join(localFacetedRoot, 'facets', 'persona'), { recursive: true });
     mkdirSync(join(localFacetedRoot, 'facets', 'policies'), { recursive: true });
+    mkdirSync(join(localFacetedRoot, 'facets', 'instructions'), { recursive: true });
     mkdirSync(join(localFacetedRoot, 'compositions'), { recursive: true });
     writeFileSync(join(localFacetedRoot, 'facets', 'persona', 'coder.md'), 'You are a local coder persona.\n', 'utf-8');
     writeFileSync(join(localFacetedRoot, 'facets', 'policies', 'coding.md'), 'Local coding policy.\n', 'utf-8');
-    writeCodingComposition(join(localFacetedRoot, 'compositions'));
+    writeFileSync(join(localFacetedRoot, 'facets', 'instructions', 'keep-local.md'), 'Use the local composition definition.\n', 'utf-8');
+    writeFileSync(
+      join(localFacetedRoot, 'compositions', 'coding.yaml'),
+      [
+        'name: coding',
+        'description: Local coding workflow',
+        'persona: coder',
+        'policies:',
+        '  - coding',
+        '  - ai-antipattern',
+        'knowledge:',
+        '  - architecture',
+        'instructions:',
+        '  - keep-local',
+      ].join('\n'),
+      'utf-8',
+    );
 
     const { runFacetCli } = await loadCliModule();
-    await expect(runFacetCli([
+    const result = await runFacetCli([
       'compose',
       '--composition',
       'coding',
@@ -478,7 +495,18 @@ describe('facet compose integration flow', () => {
       homeDir,
       select: unexpectedSelect,
       input: unexpectedInput,
-    })).rejects.toThrow('Non-interactive compose requires an unshadowed composition definition: coding');
+    });
+
+    expect(result.kind).toBe('path');
+    if (result.kind !== 'path') {
+      throw new Error('Expected path result for non-interactive compose command');
+    }
+
+    const generated = readFileSync(result.path, 'utf-8');
+    expect(generated).toContain('You are a local coder persona.');
+    expect(generated).toContain('Local coding policy.');
+    expect(generated).toContain('Use the local composition definition.');
+    expect(generated).not.toContain('Keep changes small and explicit.');
   });
 
   it('should compose non-interactively when cwd matches home and only the global composition exists', async () => {
