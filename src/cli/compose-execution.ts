@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, readFileSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { compose } from '../compose.js';
 import { formatCombinedOutput, resolveOutputDirectory, writeComposeOutput } from '../output/index.js';
@@ -17,7 +17,6 @@ import {
   shouldOverwrite,
 } from './install-skill/flow.js';
 import { applyFacetTokensToFiles, buildInlineFacetTokenValues } from './install-skill/facets.js';
-import { replaceFacetTokens } from './install-skill/facet-token-renderer.js';
 import { ensurePathAncestorsContainNoSymbolicLinks, ensurePathIsNotSymbolicLink } from './path-guard.js';
 
 function buildComposeOutputPlans(params: {
@@ -70,20 +69,6 @@ async function confirmOverwriteForExistingPaths(params: {
   return true;
 }
 
-function formatSplitOutput(params: {
-  systemPrompt: string;
-  userMessage: string;
-}): string {
-  return [
-    '=== system ===',
-    params.systemPrompt,
-    '',
-    '=== user ===',
-    params.userMessage,
-    '',
-  ].join('\n');
-}
-
 function resolveOutputDir(params: {
   output: string;
   cwd: string;
@@ -95,26 +80,20 @@ function resolveOutputDir(params: {
   return outputDir;
 }
 
-function renderTemplateOutputToText(params: {
-  templateDir: string;
-  definitionPath: string;
-  definition: ComposeDefinition;
-  facetsRoots: readonly string[];
-}): string {
-  const sections = buildSkillSections({
-    definition: params.definition,
-    definitionDir: dirname(params.definitionPath),
-    facetsRoots: params.facetsRoots,
-  });
-  const tokenValues = buildInlineFacetTokenValues(sections);
+async function resolveComposeOutputDir(params: {
+  options: FacetCliOptions;
+  composeOptions: ComposeCliOptions;
+}): Promise<string> {
+  const outputInput = params.composeOptions.output ?? (
+    isNonInteractiveMode(params.composeOptions)
+      ? params.options.cwd
+      : await params.options.input('Output directory', params.options.cwd)
+  );
 
-  return collectDirectoryFiles(params.templateDir)
-    .map(relativePath => {
-      const templatePath = resolve(params.templateDir, relativePath);
-      const rendered = replaceFacetTokens(readFileSync(templatePath, 'utf-8'), tokenValues);
-      return `--- ${relativePath} ---\n${rendered}`;
-    })
-    .join('\n');
+  return resolveOutputDir({
+    output: outputInput,
+    cwd: params.options.cwd,
+  });
 }
 
 export async function runTemplateBackedCompose(params: {
@@ -132,23 +111,9 @@ export async function runTemplateBackedCompose(params: {
 
   const templateDir = ensureTemplateDirectoryFromRoots(params.facetedRoots, templateName, dirname(params.definitionPath));
   const nonInteractive = isNonInteractiveMode(params.composeOptions);
-
-  if (params.composeOptions.output === undefined && nonInteractive) {
-    return {
-      kind: 'text',
-      text: renderTemplateOutputToText({
-        templateDir,
-        definitionPath: params.definitionPath,
-        definition: params.definition,
-        facetsRoots: params.facetsRoots,
-      }),
-    };
-  }
-
-  const outputInput = params.composeOptions.output ?? await params.options.input('Output directory', params.options.cwd);
-  const outputDir = resolveOutputDir({
-    output: outputInput,
-    cwd: params.options.cwd,
+  const outputDir = await resolveComposeOutputDir({
+    options: params.options,
+    composeOptions: params.composeOptions,
   });
 
   const templateRelativePaths = collectDirectoryFiles(templateDir);
@@ -222,19 +187,9 @@ export async function runStandardCompose(params: {
     splitSystem: splitSelection === 'Split (system + user)',
   });
 
-  if (params.composeOptions.output === undefined && nonInteractive) {
-    return {
-      kind: 'text',
-      text: params.composeOptions.outputMode === 'split'
-        ? formatSplitOutput(composed)
-        : outputPlans[0]!.content,
-    };
-  }
-
-  const outputInput = params.composeOptions.output ?? await params.options.input('Output directory', params.options.cwd);
-  const outputDir = resolveOutputDir({
-    output: outputInput,
-    cwd: params.options.cwd,
+  const outputDir = await resolveComposeOutputDir({
+    options: params.options,
+    composeOptions: params.composeOptions,
   });
 
   const existingPaths = outputPlans
