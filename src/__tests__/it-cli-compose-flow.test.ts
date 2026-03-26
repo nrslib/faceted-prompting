@@ -246,7 +246,7 @@ describe('facet compose integration flow', () => {
     expect(readFileSync(result.path, 'utf-8')).toContain('You are a release engineer.');
   });
 
-  it('should compose standard output non-interactively to stdout in split mode', async () => {
+  it('should compose standard output non-interactively into split files in the default cwd', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
@@ -266,17 +266,19 @@ describe('facet compose integration flow', () => {
       input: unexpectedInput,
     });
 
-    expect(result.kind).toBe('text');
-    if (result.kind !== 'text') {
-      throw new Error('Expected text result for split stdout compose command');
+    expect(result.kind).toBe('paths');
+    if (result.kind !== 'paths') {
+      throw new Error('Expected paths result for split compose command');
     }
-    expect(result.text).toContain('=== system ===');
-    expect(result.text).toContain('=== user ===');
-    expect(result.text).toContain('You are a release engineer.');
-    expect(result.text).toContain('Never hide errors.');
+    expect(result.paths).toEqual([
+      join(workspaceDir, 'coding.system.md'),
+      join(workspaceDir, 'coding.user.md'),
+    ]);
+    expect(readFileSync(result.paths[0]!, 'utf-8')).toContain('You are a release engineer.');
+    expect(readFileSync(result.paths[1]!, 'utf-8')).toContain('Never hide errors.');
   });
 
-  it('should compose standard output non-interactively to stdout in combined mode', async () => {
+  it('should compose standard output non-interactively into a combined file in the default cwd', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
@@ -296,13 +298,14 @@ describe('facet compose integration flow', () => {
       input: unexpectedInput,
     });
 
-    expect(result.kind).toBe('text');
-    if (result.kind !== 'text') {
-      throw new Error('Expected text result for combined stdout compose command');
+    expect(result.kind).toBe('path');
+    if (result.kind !== 'path') {
+      throw new Error('Expected path result for combined compose command');
     }
-    expect(result.text).toContain('You are a release engineer.');
-    expect(result.text).toContain('Architecture reference.');
-    expect(result.text).toContain('Never hide errors.');
+    expect(result.path).toBe(join(workspaceDir, 'coding.md'));
+    expect(readFileSync(result.path, 'utf-8')).toContain('You are a release engineer.');
+    expect(readFileSync(result.path, 'utf-8')).toContain('Architecture reference.');
+    expect(readFileSync(result.path, 'utf-8')).toContain('Never hide errors.');
   });
 
   it('should overwrite existing standard output file non-interactively when overwrite is enabled', async () => {
@@ -497,15 +500,16 @@ describe('facet compose integration flow', () => {
       input: unexpectedInput,
     });
 
-    expect(result.kind).toBe('text');
-    if (result.kind !== 'text') {
-      throw new Error('Expected text result for non-interactive compose command');
+    expect(result.kind).toBe('path');
+    if (result.kind !== 'path') {
+      throw new Error('Expected path result for non-interactive compose command');
     }
-
-    expect(result.text).toContain('You are a local coder persona.');
-    expect(result.text).toContain('Local coding policy.');
-    expect(result.text).toContain('Use the local composition definition.');
-    expect(result.text).not.toContain('Keep changes small and explicit.');
+    expect(result.path).toBe(join(workspaceDir, 'coding.md'));
+    const generated = readFileSync(result.path, 'utf-8');
+    expect(generated).toContain('You are a local coder persona.');
+    expect(generated).toContain('Local coding policy.');
+    expect(generated).toContain('Use the local composition definition.');
+    expect(generated).not.toContain('Keep changes small and explicit.');
   });
 
   it('should compose non-interactively when cwd matches home and only the global composition exists', async () => {
@@ -527,12 +531,14 @@ describe('facet compose integration flow', () => {
       input: unexpectedInput,
     });
 
-    expect(result.kind).toBe('text');
-    if (result.kind !== 'text') {
-      throw new Error('Expected text result for home-scoped non-interactive compose command');
+    expect(result.kind).toBe('path');
+    if (result.kind !== 'path') {
+      throw new Error('Expected path result for home-scoped non-interactive compose command');
     }
-    expect(result.text).toContain('You are a home-scoped release engineer.');
-    expect(result.text).toContain('Never hide errors.');
+    expect(result.path).toBe(join(homeDir, 'coding.md'));
+    const generated = readFileSync(result.path, 'utf-8');
+    expect(generated).toContain('You are a home-scoped release engineer.');
+    expect(generated).toContain('Never hide errors.');
   });
 
   it('should compose with local facets when global faceted home is not initialized', async () => {
@@ -847,7 +853,7 @@ describe('facet compose integration flow', () => {
     expect(inputPrompts.some(prompt => prompt.includes('[y/N]'))).toBe(false);
   });
 
-  it('should compose template-backed output non-interactively to stdout', async () => {
+  it('should compose template-backed output non-interactively into the default cwd', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
@@ -865,14 +871,13 @@ describe('facet compose integration flow', () => {
       input: unexpectedInput,
     });
 
-    expect(result.kind).toBe('text');
-    if (result.kind !== 'text') {
-      throw new Error('Expected text result for template stdout compose command');
+    expect(result.kind).toBe('path');
+    if (result.kind !== 'path') {
+      throw new Error('Expected path result for template compose command');
     }
-    expect(result.text).toContain('--- prompt.yaml ---');
-    expect(result.text).toContain('--- README.md ---');
-    expect(result.text).toContain('You are a template coding agent.');
-    expect(result.text).toContain('template file');
+    expect(result.path).toBe(workspaceDir);
+    expect(readFileSync(join(workspaceDir, 'prompt.yaml'), 'utf-8')).toContain('You are a template coding agent.');
+    expect(readFileSync(join(workspaceDir, 'README.md'), 'utf-8')).toContain('template file');
   });
 
   it('should compose template-backed output non-interactively into files', async () => {
@@ -979,6 +984,32 @@ describe('facet compose integration flow', () => {
     ]);
     expect(readFileSync(join(outputDir, 'coding.system.md'), 'utf-8')).toContain('You are a release engineer.');
     expect(readFileSync(join(outputDir, 'coding.user.md'), 'utf-8')).toContain('Never hide errors.');
+  });
+
+  it('should reject overwriting existing default combined output file non-interactively without overwrite', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeDefaultFacetFixture(homeDir, 'You are a release engineer.\n');
+
+    const outputPath = join(workspaceDir, 'coding.md');
+    writeFileSync(outputPath, 'existing content', 'utf-8');
+
+    const { runFacetCli } = await loadCliModule();
+    await expect(runFacetCli([
+      'compose',
+      '--composition',
+      'coding',
+      '--combined',
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    })).rejects.toThrow(`Output file exists and overwrite was cancelled: ${outputPath}`);
+
+    expect(readFileSync(outputPath, 'utf-8')).toBe('existing content');
   });
 
   it('should reject overwriting existing split output files non-interactively without overwrite', async () => {
