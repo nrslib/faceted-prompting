@@ -7,19 +7,21 @@ import {
   openSync,
   realpathSync,
   renameSync,
-  rmSync,
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
 import { basename, dirname, join } from 'node:path';
-import { ensurePathWithinHome, isWithinRoot } from './path-guard.js';
+import {
+  ensurePathAncestorsAndRealPathWithinAllowedRoots,
+  isWithinRoot,
+} from './path-guard.js';
 
-function ensureParentPathWithinHome(resolvedPath: string, homeRealPath: string): string {
+function ensureParentPathWithinAllowedRoots(resolvedPath: string, allowedRootRealPaths: readonly string[]): string {
   const outputParentDirectory = dirname(resolvedPath);
   mkdirSync(outputParentDirectory, { recursive: true });
   const outputParentRealPath = realpathSync(outputParentDirectory);
-  if (!isWithinRoot(outputParentRealPath, homeRealPath)) {
-    throw new Error(`Skill output path escapes home directory: ${resolvedPath}`);
+  if (!allowedRootRealPaths.some(root => isWithinRoot(outputParentRealPath, root))) {
+    throw new Error(`Skill output path escapes allowed roots: ${resolvedPath}`);
   }
   return outputParentRealPath;
 }
@@ -30,19 +32,11 @@ function buildTemporaryPath(targetPath: string, parentRealPath: string): string 
 
 function resolveOutputTargetPathForWrite(
   resolvedPath: string,
-  homeRealPath: string,
+  allowedRootRealPaths: readonly string[],
 ): { outputParentRealPath: string; outputTargetPath: string } {
-  const outputParentRealPath = ensureParentPathWithinHome(resolvedPath, homeRealPath);
+  const outputParentRealPath = ensureParentPathWithinAllowedRoots(resolvedPath, allowedRootRealPaths);
   const outputTargetPath = join(outputParentRealPath, basename(resolvedPath));
   return { outputParentRealPath, outputTargetPath };
-}
-
-function resolveOutputTargetPathForRemoval(resolvedPath: string, homeRealPath: string): string {
-  const outputParentRealPath = realpathSync(dirname(resolvedPath));
-  if (!isWithinRoot(outputParentRealPath, homeRealPath)) {
-    throw new Error(`Skill output path escapes home directory: ${resolvedPath}`);
-  }
-  return join(outputParentRealPath, basename(resolvedPath));
 }
 
 function writeFreshFile(path: string, content: string): void {
@@ -66,11 +60,15 @@ function writeFreshFile(path: string, content: string): void {
   }
 }
 
-export function writeSkillFile(outputPath: string, content: string, homeDir: string): void {
-  const { resolvedPath, homeRealPath } = ensurePathWithinHome(outputPath, homeDir, 'Skill output path');
+export function writeSkillFile(outputPath: string, content: string, allowedRoots: readonly string[]): void {
+  const { resolvedPath, allowedRootRealPaths } = ensurePathAncestorsAndRealPathWithinAllowedRoots(
+    outputPath,
+    allowedRoots,
+    'Skill output path',
+  );
   const { outputParentRealPath, outputTargetPath } = resolveOutputTargetPathForWrite(
     resolvedPath,
-    homeRealPath,
+    allowedRootRealPaths,
   );
   const tempOutputPath = buildTemporaryPath(outputTargetPath, outputParentRealPath);
 
@@ -89,34 +87,7 @@ export function writeSkillFile(outputPath: string, content: string, homeDir: str
   }
 
   const outputRealPath = realpathSync(outputTargetPath);
-  if (!isWithinRoot(outputRealPath, homeRealPath)) {
-    throw new Error(`Skill output path escapes home directory: ${resolvedPath}`);
+  if (!allowedRootRealPaths.some(root => isWithinRoot(outputRealPath, root))) {
+    throw new Error(`Skill output path escapes allowed roots: ${resolvedPath}`);
   }
-}
-
-export function removeSkillFile(outputPath: string, homeDir: string): void {
-  const { resolvedPath, homeRealPath } = ensurePathWithinHome(outputPath, homeDir, 'Skill output path');
-
-  if (!existsSync(resolvedPath)) {
-    return;
-  }
-
-  const outputTargetPath = resolveOutputTargetPathForRemoval(resolvedPath, homeRealPath);
-  const fileStat = lstatSync(outputTargetPath);
-  if (fileStat.isSymbolicLink()) {
-    throw new Error(`Symbolic links are not allowed for skill output file: ${resolvedPath}`);
-  }
-
-  const fileRealPath = realpathSync(outputTargetPath);
-  if (!isWithinRoot(fileRealPath, homeRealPath)) {
-    throw new Error(`Skill output path escapes home directory: ${resolvedPath}`);
-  }
-
-  const outputParentRealPath = ensureParentPathWithinHome(outputTargetPath, homeRealPath);
-  const quarantinePath = join(
-    outputParentRealPath,
-    `.${basename(outputTargetPath)}.${process.pid}.${Date.now()}.delete`,
-  );
-  renameSync(outputTargetPath, quarantinePath);
-  rmSync(quarantinePath, { force: true });
 }

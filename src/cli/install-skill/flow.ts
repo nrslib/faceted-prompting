@@ -16,6 +16,7 @@ import {
 import { basename, dirname, join, resolve } from 'node:path';
 import {
   ensurePathAncestorsAndRealPathWithinHome,
+  ensurePathAncestorsAndRealPathWithinAllowedRoots,
   ensurePathAncestorsContainNoSymbolicLinks,
   ensurePathIsNotSymbolicLink,
   isWithinRoot,
@@ -23,7 +24,12 @@ import {
 } from '../path-guard.js';
 import { isResourcePath, resolveResourcePath } from '../../resolve.js';
 import type { FacetCliOptions } from '../types.js';
-export { defaultOutputPath, listInstallTargets, resolveInstallTarget } from './targets.js';
+export {
+  defaultOutputPath,
+  listInstallTargets,
+  resolveInstallTarget,
+  resolveInstallTargetRoots,
+} from './targets.js';
 
 export function shouldOverwrite(answer: string): boolean {
   const normalized = answer.trim().toLowerCase();
@@ -205,7 +211,13 @@ function ensurePathSafety(params: {
   promptLabel: string;
   cwd: string;
   homeDir?: string;
+  allowedRoots?: readonly string[];
 }): void {
+  if (params.allowedRoots) {
+    ensurePathAncestorsAndRealPathWithinAllowedRoots(params.targetDir, params.allowedRoots, params.promptLabel);
+    return;
+  }
+
   if (params.homeDir) {
     ensurePathAncestorsAndRealPathWithinHome(params.targetDir, params.homeDir, params.promptLabel);
     return;
@@ -220,6 +232,7 @@ export async function ensureRegenerationTargetDir(params: {
   options: FacetCliOptions;
   promptLabel: string;
   homeDir?: string;
+  allowedRoots?: readonly string[];
 }): Promise<void> {
   const { targetDir, options, promptLabel } = params;
   if (params.homeDir && resolve(targetDir) === resolve(params.homeDir)) {
@@ -229,6 +242,7 @@ export async function ensureRegenerationTargetDir(params: {
     targetDir,
     promptLabel,
     homeDir: params.homeDir,
+    allowedRoots: params.allowedRoots,
     cwd: options.cwd,
   });
 

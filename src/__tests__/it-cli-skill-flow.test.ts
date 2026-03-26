@@ -153,7 +153,7 @@ describe('facet skill integration flow', () => {
       'utf-8',
     );
 
-    const defaultSkillOutputPath = join(homeDir, '.codex', 'skills', 'coding', 'SKILL.md');
+    const defaultSkillOutputPath = join(homeDir, '.agents', 'skills', 'coding', 'SKILL.md');
     const { runFacetCli } = await loadCliModule();
     const result = await runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
@@ -281,7 +281,7 @@ describe('facet skill integration flow', () => {
     tempDirs.push(workspaceDir, homeDir);
     createFacetedFixture(homeDir);
 
-    const defaultSkillOutputPath = join(homeDir, '.codex', 'skills', 'coding', 'SKILL.md');
+    const defaultSkillOutputPath = join(homeDir, '.agents', 'skills', 'coding', 'SKILL.md');
     const { runFacetCli } = await loadCliModule();
 
     const result = await runFacetCli(['install', 'skill'], {
@@ -339,11 +339,11 @@ describe('facet skill integration flow', () => {
       },
     });
 
-    expect(result).toEqual({ kind: 'path', path: join(homeDir, '.codex', 'skills', 'issue-worktree', 'SKILL.md') });
+    expect(result).toEqual({ kind: 'path', path: join(homeDir, '.agents', 'skills', 'issue-worktree', 'SKILL.md') });
     expect(seenPrompts.some(prompt => prompt.includes('Output directory'))).toBe(false);
     expect(seenPrompts.some(prompt => prompt.includes('Scan depth'))).toBe(false);
     expect(seenPrompts.some(prompt => prompt.includes('Choose skill mode'))).toBe(false);
-    expect(existsSync(join(homeDir, '.codex', 'skills', 'issue-worktree', 'SKILL.md'))).toBe(true);
+    expect(existsSync(join(homeDir, '.agents', 'skills', 'issue-worktree', 'SKILL.md'))).toBe(true);
   });
 
   it('should reject install when compose definition name is unsafe', async () => {
@@ -362,7 +362,7 @@ describe('facet skill integration flow', () => {
     })).rejects.toThrow('Invalid compose definition name: ../unsafe');
   });
 
-  it('should reject install when skill output path is outside home directory', async () => {
+  it('should reject install when skill output path is outside target directory', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
@@ -376,7 +376,7 @@ describe('facet skill integration flow', () => {
       select: createSelectStub(['coding (global)', 'Claude Code']),
       input: async (prompt, defaultValue) =>
         prompt.toLowerCase().includes('output') ? outsidePath : defaultValue,
-    })).rejects.toThrow(`Skill output path must be inside home directory: ${outsidePath}`);
+    })).rejects.toThrow(`Skill output path must be inside target directory: ${join(homeDir, '.claude', 'skills')}`);
   });
 
   it('should reject install when output path points to target root SKILL.md', async () => {
@@ -478,7 +478,7 @@ describe('facet skill integration flow', () => {
       'utf-8',
     );
 
-    const outputPath = join(homeDir, '.codex', 'skills', 'coding', 'SKILL.md');
+    const outputPath = join(homeDir, '.agents', 'skills', 'coding', 'SKILL.md');
     const { runFacetCli } = await loadCliModule();
     const result = await runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,

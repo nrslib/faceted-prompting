@@ -44,6 +44,17 @@ export function ensurePathWithinRoots(path: string, roots: readonly string[], la
   throw new Error(`${label} must be inside allowed facets directory: ${realPath}`);
 }
 
+export function ensurePathWithinAllowedRoots(path: string, roots: readonly string[], label: string): string {
+  const resolvedPath = resolve(path);
+  const resolvedRoots = roots.map(root => resolve(root));
+
+  if (!resolvedRoots.some(root => isWithinRoot(resolvedPath, root))) {
+    throw new Error(`${label} must be inside allowed roots: ${resolvedPath}`);
+  }
+
+  return resolvedPath;
+}
+
 export function ensurePathIsNotSymbolicLink(path: string, label: string): string {
   const resolvedPath = resolve(path);
   if (!existsSync(resolvedPath)) {
@@ -143,4 +154,29 @@ export function ensurePathAncestorsAndRealPathWithinHome(
   }
 
   return { resolvedPath, homeRealPath };
+}
+
+export function ensurePathAncestorsAndRealPathWithinAllowedRoots(
+  path: string,
+  roots: readonly string[],
+  label: string,
+): { resolvedPath: string; allowedRootRealPaths: readonly string[] } {
+  const resolvedPath = ensurePathWithinAllowedRoots(path, roots, label);
+  const resolvedRoots = roots.map(root => resolve(root));
+  const containingRoot = resolvedRoots.find(root => isWithinRoot(resolvedPath, root));
+  if (!containingRoot) {
+    throw new Error(`${label} must be inside allowed roots: ${resolvedPath}`);
+  }
+
+  ensurePathAncestorsContainNoSymbolicLinks(resolvedPath, label, containingRoot);
+
+  const existingAncestor = findNearestExistingAncestor(resolvedPath);
+  const ancestorRealPath = realpathSync(existingAncestor);
+  const allowedRootRealPaths = resolvedRoots.map(root => (existsSync(root) ? realpathSync(root) : root));
+  const containingRootRealPath = existsSync(containingRoot) ? realpathSync(containingRoot) : undefined;
+  if (containingRootRealPath && !isWithinRoot(ancestorRealPath, containingRootRealPath)) {
+    throw new Error(`${label} must resolve inside allowed roots: ${resolvedPath}`);
+  }
+
+  return { resolvedPath, allowedRootRealPaths };
 }

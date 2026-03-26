@@ -1,22 +1,24 @@
 import { join } from 'node:path';
-import type { InstallTarget } from '../skill-types.js';
+import type { FacetedConfig } from '../../config/index.js';
+import {
+  getBuiltInInstallRootTemplates,
+  resolveInstallRootTemplates,
+} from '../../config/install-targets.js';
+import type { InstallTarget } from '../../install-targets.js';
 
 export interface InstallTargetDefinition {
   readonly key: InstallTarget;
   readonly label: string;
-  readonly relativeOutputPath: readonly string[];
 }
 
 const INSTALL_TARGETS: readonly InstallTargetDefinition[] = [
   {
     key: 'cc',
     label: 'Claude Code',
-    relativeOutputPath: ['.claude', 'skills'],
   },
   {
     key: 'codex',
     label: 'Codex',
-    relativeOutputPath: ['.codex', 'skills'],
   },
 ];
 
@@ -32,10 +34,32 @@ export function resolveInstallTarget(targetLabel: string): InstallTargetDefiniti
   return definition;
 }
 
+function resolveCodexInstallRoots(homeDir: string, config?: FacetedConfig): readonly string[] {
+  const rootTemplates = config?.install.targets.codex.roots ?? getBuiltInInstallRootTemplates('codex');
+  return resolveInstallRootTemplates(homeDir, rootTemplates);
+}
+
+export function resolveInstallTargetRoots(
+  homeDir: string,
+  target: InstallTargetDefinition,
+  config?: FacetedConfig,
+): readonly string[] {
+  if (target.key === 'codex') {
+    return resolveCodexInstallRoots(homeDir, config);
+  }
+  return resolveInstallRootTemplates(homeDir, getBuiltInInstallRootTemplates(target.key));
+}
+
 export function defaultOutputPath(
   homeDir: string,
   skillName: string,
   target: InstallTargetDefinition,
+  config?: FacetedConfig,
 ): string {
-  return join(homeDir, ...target.relativeOutputPath, skillName, 'SKILL.md');
+  const roots = resolveInstallTargetRoots(homeDir, target, config);
+  const primaryRoot = roots[0];
+  if (!primaryRoot) {
+    throw new Error(`Install target roots are required: ${target.key}`);
+  }
+  return join(primaryRoot, skillName, 'SKILL.md');
 }

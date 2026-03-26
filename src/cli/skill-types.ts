@@ -1,7 +1,6 @@
 import type { ComposeDefinition } from '../types.js';
 
 export type SkillMode = 'inline' | 'reference';
-export type InstallTarget = 'cc' | 'codex';
 
 export interface FacetRefContent {
   readonly body: string;

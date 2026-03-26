@@ -1,7 +1,7 @@
 import { existsSync, realpathSync } from 'node:fs';
 import { dirname, join, resolve, sep } from 'node:path';
 import { loadComposeDefinition } from '../compose-definition.js';
-import { getFacetedRoot } from '../config/index.js';
+import { getFacetedRoot, readFacetedConfigOrDefault } from '../config/index.js';
 import {
   buildSkillSections,
   ensureSafeDefinitionName,
@@ -157,6 +157,7 @@ export async function runInstallSkillCommand(options: FacetCliOptions): Promise<
   const definition = await loadComposeDefinition(definitionPath);
   const safeSkillName = ensureSafeDefinitionName(definition.name);
   const definitionDir = dirname(definitionPath);
+  const config = await readFacetedConfigOrDefault(options.homeDir);
   const sections = buildSkillSections({
     definition,
     definitionDir,
@@ -168,6 +169,7 @@ export async function runInstallSkillCommand(options: FacetCliOptions): Promise<
     facetedRoots,
     definitionDir,
     facetsRoots,
+    config,
     safeSkillName,
     definition,
     sections,
