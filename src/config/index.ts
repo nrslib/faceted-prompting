@@ -4,7 +4,7 @@ import { tracedConfig, type ValidateError } from 'traced-config';
 import { parse } from 'yaml';
 import {
   getBuiltInInstallRootTemplates,
-  hasNonEmptyInstallRootTemplate,
+  readInstallRootTemplatesFromConfigValue,
 } from './install-targets.js';
 
 export interface CodexInstallTargetConfig {
@@ -61,53 +61,8 @@ function hasErrorCode(error: unknown): error is NodeJS.ErrnoException {
   return typeof withCode.code === 'string';
 }
 
-function invalidConfigField(field: string): never {
-  throw new Error(`Invalid faceted config field: ${field}`);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
 function readCodexInstallRoots(configRoot: Record<string, unknown>): readonly string[] {
-  const defaultCodexInstallRoots = getBuiltInInstallRootTemplates('codex');
-  const installValue = configRoot.install;
-  if (installValue === undefined) {
-    return defaultCodexInstallRoots;
-  }
-  if (!isRecord(installValue)) {
-    invalidConfigField('install.targets.codex.roots');
-  }
-
-  const targetsValue = installValue.targets;
-  if (targetsValue === undefined) {
-    return defaultCodexInstallRoots;
-  }
-  if (!isRecord(targetsValue)) {
-    invalidConfigField('install.targets.codex.roots');
-  }
-
-  const codexValue = targetsValue.codex;
-  if (codexValue === undefined) {
-    return defaultCodexInstallRoots;
-  }
-  if (!isRecord(codexValue)) {
-    invalidConfigField('install.targets.codex.roots');
-  }
-
-  const rootsValue = codexValue.roots;
-  if (rootsValue === undefined) {
-    return defaultCodexInstallRoots;
-  }
-  if (
-    !Array.isArray(rootsValue)
-    || rootsValue.length === 0
-    || rootsValue.some(root => typeof root !== 'string' || !hasNonEmptyInstallRootTemplate(root))
-  ) {
-    invalidConfigField('install.targets.codex.roots');
-  }
-
-  return [...rootsValue];
+  return readInstallRootTemplatesFromConfigValue('codex', configRoot);
 }
 
 export function createDefaultFacetedConfig(): FacetedConfig {

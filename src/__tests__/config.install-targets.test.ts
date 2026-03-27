@@ -85,6 +85,83 @@ describe('readFacetedConfig install target roots', () => {
     ]);
   });
 
+  it('should keep built-in Codex install roots when config.yaml omits the codex target object', async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), 'faceted-config-install-'));
+    tempDirs.push(homeDir);
+    writeConfig(
+      homeDir,
+      [
+        'version: 1',
+        'install:',
+        '  targets: {}',
+      ].join('\n'),
+    );
+
+    const { readFacetedConfig } = await loadConfigModule();
+    const config = await readFacetedConfig(homeDir);
+
+    expect(config.install?.targets?.codex?.roots).toEqual([
+      '{homeDir}/.agents/skills',
+    ]);
+  });
+
+  it('should throw when install is not an object', async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), 'faceted-config-install-'));
+    tempDirs.push(homeDir);
+    writeConfig(
+      homeDir,
+      [
+        'version: 1',
+        'install: invalid',
+      ].join('\n'),
+    );
+
+    const { readFacetedConfig } = await loadConfigModule();
+
+    await expect(readFacetedConfig(homeDir)).rejects.toThrow(
+      'Invalid faceted config field: install.targets.codex.roots',
+    );
+  });
+
+  it('should throw when install.targets is not an object', async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), 'faceted-config-install-'));
+    tempDirs.push(homeDir);
+    writeConfig(
+      homeDir,
+      [
+        'version: 1',
+        'install:',
+        '  targets: invalid',
+      ].join('\n'),
+    );
+
+    const { readFacetedConfig } = await loadConfigModule();
+
+    await expect(readFacetedConfig(homeDir)).rejects.toThrow(
+      'Invalid faceted config field: install.targets.codex.roots',
+    );
+  });
+
+  it('should throw when install.targets.codex is not an object', async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), 'faceted-config-install-'));
+    tempDirs.push(homeDir);
+    writeConfig(
+      homeDir,
+      [
+        'version: 1',
+        'install:',
+        '  targets:',
+        '    codex: invalid',
+      ].join('\n'),
+    );
+
+    const { readFacetedConfig } = await loadConfigModule();
+
+    await expect(readFacetedConfig(homeDir)).rejects.toThrow(
+      'Invalid faceted config field: install.targets.codex.roots',
+    );
+  });
+
   it('should throw when install.targets.codex.roots contains non-string entries', async () => {
     const homeDir = mkdtempSync(join(tmpdir(), 'faceted-config-install-'));
     tempDirs.push(homeDir);

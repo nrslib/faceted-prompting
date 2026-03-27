@@ -2,6 +2,7 @@ import { join } from 'node:path';
 import type { FacetedConfig } from '../../config/index.js';
 import {
   getBuiltInInstallRootTemplates,
+  readInstallRootTemplatesFromConfigValue,
   resolveInstallRootTemplates,
 } from '../../config/install-targets.js';
 import type { InstallTarget } from '../../install-targets.js';
@@ -35,7 +36,7 @@ export function resolveInstallTarget(targetLabel: string): InstallTargetDefiniti
 }
 
 function resolveCodexInstallRoots(homeDir: string, config?: FacetedConfig): readonly string[] {
-  const rootTemplates = config?.install.targets.codex.roots ?? getBuiltInInstallRootTemplates('codex');
+  const rootTemplates = readInstallRootTemplatesFromConfigValue('codex', config);
   return resolveInstallRootTemplates(homeDir, rootTemplates);
 }
 

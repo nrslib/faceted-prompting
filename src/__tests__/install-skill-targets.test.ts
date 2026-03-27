@@ -52,6 +52,29 @@ describe('install skill targets', () => {
     );
   });
 
+  it('should resolve configured Codex root templates before selecting the default output path', () => {
+    const codex = resolveInstallTarget('Codex');
+    const config = {
+      version: 1,
+      skillPaths: [],
+      install: {
+        targets: {
+          codex: {
+            roots: ['{homeDir}/.agents/skills', '/srv/shared/skills'],
+          },
+        },
+      },
+    } satisfies FacetedConfig;
+
+    expect(resolveInstallTargetRoots('/home/tester', codex, config)).toEqual([
+      '/home/tester/.agents/skills',
+      '/srv/shared/skills',
+    ]);
+    expect(defaultOutputPath('/home/tester', 'coding', codex, config)).toBe(
+      '/home/tester/.agents/skills/coding/SKILL.md',
+    );
+  });
+
   it('should use only configured Codex roots when resolving allowed install targets', () => {
     const codex = resolveInstallTarget('Codex');
     const config = {
@@ -87,7 +110,7 @@ describe('install skill targets', () => {
     } satisfies FacetedConfig;
 
     expect(() => resolveInstallTargetRoots('/home/tester', codex, config)).toThrow(
-      'Install root template must not be empty',
+      'Invalid faceted config field: install.targets.codex.roots',
     );
   });
 });
