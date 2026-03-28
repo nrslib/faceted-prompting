@@ -122,7 +122,7 @@ describe('facet install template-backed skill integration flow', () => {
     tempDirs.push(workspaceDir, homeDir);
     createFacetedFixture(homeDir);
 
-    const skillOutputPath = join(homeDir, '.codex', 'skills', 'templated-skill', 'SKILL.md');
+    const skillOutputPath = join(homeDir, '.agents', 'skills', 'templated-skill', 'SKILL.md');
     const { runFacetCli } = await loadCliModule();
 
     const result = await runFacetCli(['install', 'skill'], {
@@ -136,10 +136,10 @@ describe('facet install template-backed skill integration flow', () => {
     expect(readFileSync(skillOutputPath, 'utf-8')).toMatch(/^---\nname: templated-skill\n---\n/m);
     expect(readFileSync(skillOutputPath, 'utf-8')).toContain('You are a coding agent.');
     expect(readFileSync(skillOutputPath, 'utf-8')).not.toContain('/facets/persona/coder.md');
-    expect(readFileSync(join(homeDir, '.codex', 'skills', 'templated-skill', 'README.md'), 'utf-8')).toBe(
+    expect(readFileSync(join(homeDir, '.agents', 'skills', 'templated-skill', 'README.md'), 'utf-8')).toBe(
       'template file',
     );
-    expect(existsSync(join(homeDir, '.codex', 'skills', 'templated-skill', 'facets', 'persona', 'coder.md'))).toBe(
+    expect(existsSync(join(homeDir, '.agents', 'skills', 'templated-skill', 'facets', 'persona', 'coder.md'))).toBe(
       true,
     );
   });
@@ -150,7 +150,7 @@ describe('facet install template-backed skill integration flow', () => {
     tempDirs.push(workspaceDir, homeDir);
     createFacetedFixture(homeDir);
 
-    const skillDir = join(homeDir, '.codex', 'skills', 'templated-skill');
+    const skillDir = join(homeDir, '.agents', 'skills', 'templated-skill');
     mkdirSync(skillDir, { recursive: true });
     writeFileSync(join(skillDir, 'stale.txt'), 'stale', 'utf-8');
     const { runFacetCli } = await loadCliModule();
@@ -171,8 +171,8 @@ describe('facet install template-backed skill integration flow', () => {
   it('should reject template-backed install when target directory path includes a symbolic link ancestor', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
-    const realCodexDir = join(homeDir, '.codex-real');
-    const codexLinkDir = join(homeDir, '.codex');
+    const realCodexDir = join(homeDir, '.agents-real');
+    const codexLinkDir = join(homeDir, '.agents');
     tempDirs.push(workspaceDir, homeDir);
     createFacetedFixture(homeDir);
 
@@ -204,7 +204,7 @@ describe('facet install template-backed skill integration flow', () => {
       select: createSelectStub(['templated (global)', 'Codex']),
       input: async (prompt, defaultValue) =>
         prompt.toLowerCase().includes('output') ? disallowedOutputPath : defaultValue,
-    })).rejects.toThrow(`Skill output path must be inside target directory: ${join(homeDir, '.codex', 'skills')}`);
+    })).rejects.toThrow(`Skill output path must be inside target directory: ${join(homeDir, '.agents', 'skills')}`);
   });
 
   it('should install template-backed skill even when composition has no instruction', async () => {
@@ -213,7 +213,7 @@ describe('facet install template-backed skill integration flow', () => {
     tempDirs.push(workspaceDir, homeDir);
     createFacetedFixture(homeDir);
 
-    const skillOutputPath = join(homeDir, '.codex', 'skills', 'templated-no-instruction-skill', 'SKILL.md');
+    const skillOutputPath = join(homeDir, '.agents', 'skills', 'templated-no-instruction-skill', 'SKILL.md');
     const { runFacetCli } = await loadCliModule();
 
     const result = await runFacetCli(['install', 'skill'], {
@@ -253,7 +253,7 @@ describe('facet install template-backed skill integration flow', () => {
       'utf-8',
     );
 
-    const skillOutputPath = join(homeDir, '.codex', 'skills', 'templated-skill', 'SKILL.md');
+    const skillOutputPath = join(homeDir, '.agents', 'skills', 'templated-skill', 'SKILL.md');
     const { runFacetCli } = await loadCliModule();
     const result = await runFacetCli(['install', 'skill'], {
       cwd: workspaceDir,
@@ -265,6 +265,6 @@ describe('facet install template-backed skill integration flow', () => {
 
     expect(result).toEqual({ kind: 'path', path: skillOutputPath });
     expect(readFileSync(skillOutputPath, 'utf-8')).toContain('Local persona');
-    expect(existsSync(join(homeDir, '.codex', 'skills', 'templated-skill', 'README.md'))).toBe(true);
+    expect(existsSync(join(homeDir, '.agents', 'skills', 'templated-skill', 'README.md'))).toBe(true);
   });
 });

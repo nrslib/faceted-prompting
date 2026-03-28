@@ -2,10 +2,27 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tracedConfig, type ValidateError } from 'traced-config';
 import { parse } from 'yaml';
+import {
+  getBuiltInInstallRootTemplates,
+  readInstallRootTemplatesFromConfigValue,
+} from './install-targets.js';
+
+export interface CodexInstallTargetConfig {
+  readonly roots: readonly string[];
+}
+
+export interface InstallTargetsConfig {
+  readonly codex: CodexInstallTargetConfig;
+}
+
+export interface InstallConfig {
+  readonly targets: InstallTargetsConfig;
+}
 
 export interface FacetedConfig {
   readonly version: number;
   readonly skillPaths?: readonly string[];
+  readonly install: InstallConfig;
 }
 
 const DEFAULT_CONFIG = ['version: 1', 'skillPaths: []'].join('\n');
@@ -44,12 +61,40 @@ function hasErrorCode(error: unknown): error is NodeJS.ErrnoException {
   return typeof withCode.code === 'string';
 }
 
+function readCodexInstallRoots(configRoot: Record<string, unknown>): readonly string[] {
+  return readInstallRootTemplatesFromConfigValue('codex', configRoot);
+}
+
+export function createDefaultFacetedConfig(): FacetedConfig {
+  return {
+    version: 1,
+    skillPaths: [],
+    install: {
+      targets: {
+        codex: {
+          roots: getBuiltInInstallRootTemplates('codex'),
+        },
+      },
+    },
+  };
+}
+
+export async function readFacetedConfigOrDefault(homeDir: string): Promise<FacetedConfig> {
+  const configPath = getConfigPath(homeDir);
+  if (!existsSync(configPath)) {
+    return createDefaultFacetedConfig();
+  }
+
+  return readFacetedConfig(homeDir);
+}
+
 export async function readFacetedConfig(homeDir: string): Promise<FacetedConfig> {
   const configPath = getConfigPath(homeDir);
   if (!existsSync(configPath)) {
     throw new Error(`Missing faceted config: ${configPath}`);
   }
 
+  let parsedConfigRoot: Record<string, unknown> | undefined;
   const resolver = tracedConfig({
     schema: {
       version: {
@@ -70,8 +115,14 @@ export async function readFacetedConfig(homeDir: string): Promise<FacetedConfig>
   resolver.addFormat('string-list', value => {
     return Array.isArray(value) && value.every(item => typeof item === 'string');
   });
-  resolver.addParser('yaml', parseConfigRootAsObject);
-  resolver.addParser('yml', parseConfigRootAsObject);
+  resolver.addParser('yaml', content => {
+    parsedConfigRoot = parseConfigRootAsObject(content);
+    return parsedConfigRoot;
+  });
+  resolver.addParser('yml', content => {
+    parsedConfigRoot = parseConfigRootAsObject(content);
+    return parsedConfigRoot;
+  });
 
   try {
     await resolver.loadFile([{ path: configPath, label: 'local' }]);
@@ -91,8 +142,21 @@ export async function readFacetedConfig(homeDir: string): Promise<FacetedConfig>
     throw new Error('Invalid faceted config field');
   }
 
+  if (!parsedConfigRoot) {
+    throw new Error(`Invalid faceted config file: ${configPath}`);
+  }
+
+  const codexRoots = readCodexInstallRoots(parsedConfigRoot);
+
   return {
     version: resolver.get('version'),
     skillPaths: resolver.get('skillPaths'),
+    install: {
+      targets: {
+        codex: {
+          roots: codexRoots,
+        },
+      },
+    },
   };
 }

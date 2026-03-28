@@ -8,6 +8,13 @@ type ConfigModule = {
   readFacetedConfig: (homeDir: string) => Promise<{
     version: number;
     skillPaths?: readonly string[];
+    install: {
+      targets: {
+        codex: {
+          roots: readonly string[];
+        };
+      };
+    };
   }>;
 };
 
@@ -47,6 +54,13 @@ describe('readFacetedConfig traced-config integration', () => {
     expect(config).toEqual({
       version: 2,
       skillPaths: ['/skills/custom'],
+      install: {
+        targets: {
+          codex: {
+            roots: ['{homeDir}/.agents/skills'],
+          },
+        },
+      },
     });
   });
 
@@ -125,6 +139,13 @@ describe('readFacetedConfig traced-config integration', () => {
     expect(config).toEqual({
       version: 2,
       skillPaths: ['/skills/custom'],
+      install: {
+        targets: {
+          codex: {
+            roots: ['{homeDir}/.agents/skills'],
+          },
+        },
+      },
     });
     expect(parseCallCount).toBe(1);
   });

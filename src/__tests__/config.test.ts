@@ -8,6 +8,24 @@ type ConfigModule = {
   readFacetedConfig: (homeDir: string) => Promise<{
     version: number;
     skillPaths?: readonly string[];
+    install: {
+      targets: {
+        codex: {
+          roots: readonly string[];
+        };
+      };
+    };
+  }>;
+  readFacetedConfigOrDefault: (homeDir: string) => Promise<{
+    version: number;
+    skillPaths?: readonly string[];
+    install: {
+      targets: {
+        codex: {
+          roots: readonly string[];
+        };
+      };
+    };
   }>;
 };
 
@@ -42,6 +60,13 @@ describe('readFacetedConfig', () => {
     expect(config).toEqual({
       version: 2,
       skillPaths: ['/skills/custom'],
+      install: {
+        targets: {
+          codex: {
+            roots: ['{homeDir}/.agents/skills'],
+          },
+        },
+      },
     });
   });
 
@@ -66,6 +91,7 @@ describe('readFacetedConfig', () => {
     const config = await readFacetedConfig(homeDir);
 
     expect(config.skillPaths).toEqual([]);
+    expect(config.install.targets.codex.roots).toEqual(['{homeDir}/.agents/skills']);
   });
 
   it('should fill version from default layer when config.yaml omits the field', async () => {
@@ -77,6 +103,7 @@ describe('readFacetedConfig', () => {
     const config = await readFacetedConfig(homeDir);
 
     expect(config.version).toBe(1);
+    expect(config.install.targets.codex.roots).toEqual(['{homeDir}/.agents/skills']);
   });
 
   it('should throw when skillPaths contains non-string entries', async () => {
@@ -113,5 +140,25 @@ describe('readFacetedConfig', () => {
     await expect(readFacetedConfig(homeDir)).rejects.toThrow(
       `Invalid faceted config file: ${join(homeDir, '.faceted', 'config.yaml')}`,
     );
+  });
+
+  it('should return the built-in default config when config.yaml is missing', async () => {
+    const homeDir = mkdtempSync(join(tmpdir(), 'faceted-config-'));
+    tempDirs.push(homeDir);
+
+    const { readFacetedConfigOrDefault } = await loadConfigModule();
+    const config = await readFacetedConfigOrDefault(homeDir);
+
+    expect(config).toEqual({
+      version: 1,
+      skillPaths: [],
+      install: {
+        targets: {
+          codex: {
+            roots: ['{homeDir}/.agents/skills'],
+          },
+        },
+      },
+    });
   });
 });

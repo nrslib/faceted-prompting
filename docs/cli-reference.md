@@ -79,7 +79,7 @@ facet install skill
 2. Prompts to select a composition
 3. Prompts to select a target:
    - **Claude Code** — installs to `~/.claude/skills/{name}/SKILL.md`
-   - **Codex** — installs to `~/.codex/skills/{name}/SKILL.md`
+   - **Codex** — installs to `~/.agents/skills/{name}/SKILL.md`
 4. Copies facet files and generates the skill document
 
 When a composition definition includes a `template` field, install still targets Claude Code or Codex, but it copies the template directory structure and injects facet tokens (`{{facet:persona}}`, `{{facet:knowledges}}`, `{{facet:policies}}`, `{{facet:instructions}}`).

@@ -1,6 +1,6 @@
 import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
-import { ensurePathWithinHome, isWithinRoot } from '../path-guard.js';
+import { isWithinRoot } from '../path-guard.js';
 import { hasYamlFrontmatter, renderSkillDocument, renderSkillFrontmatter } from '../skill-renderer.js';
 import { writeSkillFile } from '../skill-file-ops.js';
 import type { FacetCliOptions, FacetCliResult } from '../types.js';
@@ -16,16 +16,18 @@ import {
   listInstallTargets,
   ensureTemplateDirectoryFromRoots,
   resolveInstallTarget,
+  resolveInstallTargetRoots,
 } from './flow.js';
 import type { SkillSections } from './facets.js';
 import type { ComposeDefinition } from '../../types.js';
-import type { InstallTarget } from '../skill-types.js';
+import type { InstallTarget } from '../../install-targets.js';
 import { composePromptPayload } from '../../prompt-payload.js';
+import type { FacetedConfig } from '../../config/index.js';
 
 function ensureTemplateBackedSkillFrontmatter(params: {
   outputPath: string;
   definition: ComposeDefinition;
-  homeDir: string;
+  targetRoots: readonly string[];
 }): void {
   if (!existsSync(params.outputPath)) {
     return;
@@ -37,7 +39,7 @@ function ensureTemplateBackedSkillFrontmatter(params: {
   }
 
   const contentWithFrontmatter = `${renderSkillFrontmatter(params.definition)}\n${currentContent.trimStart()}`;
-  writeSkillFile(params.outputPath, contentWithFrontmatter, params.homeDir);
+  writeSkillFile(params.outputPath, contentWithFrontmatter, params.targetRoots);
 }
 
 export async function runSkillDeployInstall(params: {
@@ -45,6 +47,7 @@ export async function runSkillDeployInstall(params: {
   facetedRoots: readonly string[];
   definitionDir: string;
   facetsRoots: readonly string[];
+  config: FacetedConfig;
   safeSkillName: string;
   definition: ComposeDefinition;
   sections: SkillSections;
@@ -55,16 +58,13 @@ export async function runSkillDeployInstall(params: {
   );
   const target = resolveInstallTarget(targetLabel);
   const mode = 'inline' as const;
-  const defaultPath = defaultOutputPath(params.options.homeDir, params.safeSkillName, target);
+  const targetRoots = resolveInstallTargetRoots(params.options.homeDir, target, params.config);
+  const defaultPath = defaultOutputPath(params.options.homeDir, params.safeSkillName, target, params.config);
   const outputPath = resolve(await params.options.input('Output path', defaultPath));
-  const { resolvedPath: boundedOutputPath } = ensurePathWithinHome(
-    outputPath,
-    params.options.homeDir,
-    'Skill output path',
-  );
-  const targetRootDir = resolve(params.options.homeDir, ...target.relativeOutputPath);
-  if (!isWithinRoot(boundedOutputPath, targetRootDir)) {
-    throw new Error(`Skill output path must be inside target directory: ${targetRootDir}`);
+  const boundedOutputPath = outputPath;
+  if (!targetRoots.some(targetRoot => isWithinRoot(boundedOutputPath, targetRoot))) {
+    const allowedRoots = targetRoots.join(', ');
+    throw new Error(`Skill output path must be inside target directory: ${allowedRoots}`);
   }
   if (basename(boundedOutputPath) !== 'SKILL.md') {
     throw new Error(`Skill output path must point to SKILL.md: ${boundedOutputPath}`);
@@ -84,15 +84,15 @@ export async function runSkillDeployInstall(params: {
     composeOptions: { contextMaxChars: 8000 },
   });
   const targetDir = dirname(boundedOutputPath);
-  if (resolve(targetDir) === targetRootDir) {
-    throw new Error(`Skill output path must include a skill directory under target directory: ${targetRootDir}`);
+  if (targetRoots.some(targetRoot => resolve(targetDir) === targetRoot)) {
+    throw new Error(`Skill output path must include a skill directory under target directory: ${targetRoots.join(', ')}`);
   }
 
   await ensureRegenerationTargetDir({
     targetDir,
     options: params.options,
     promptLabel: 'Target directory',
-    homeDir: params.options.homeDir,
+    allowedRoots: targetRoots,
   });
 
   if (templateDir) {
@@ -118,7 +118,7 @@ export async function runSkillDeployInstall(params: {
     ensureTemplateBackedSkillFrontmatter({
       outputPath: boundedOutputPath,
       definition: params.definition,
-      homeDir: params.options.homeDir,
+      targetRoots,
     });
   } else {
     copyFacetFiles({
@@ -136,7 +136,7 @@ export async function runSkillDeployInstall(params: {
       mode,
     });
 
-    writeSkillFile(boundedOutputPath, content, params.options.homeDir);
+    writeSkillFile(boundedOutputPath, content, targetRoots);
   }
 
   return {
