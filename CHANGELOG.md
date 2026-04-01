@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-04-01
+
+### Added
+- `facet compose` に非対話モードを追加。`--composition`, `--split`/`--combined`, `--output`, `--overwrite` オプションでスクリプトやCI からの利用が可能に (#28)
+
+### Changed
+- スキルインストール先パスを設定ファイル (`config.yaml`) で管理するよう変更。`install.targets.codex.roots` で Codex のインストール先ディレクトリを指定可能に (#27)
+
+### Internal
+- `compose-command.ts` を `compose-definition-resolution.ts`, `compose-execution.ts`, `compose-options.ts` に分割リファクタリング
+- TAKT quality gate 設定ファイルを追加
+- CLI の不要な stdout 出力を除去
+
 ## [0.3.1] - 2026-03-19
 
 ### Changed
