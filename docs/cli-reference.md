@@ -54,7 +54,7 @@ Compose prompts using auto-detected project context.
 facet compose
 ```
 
-**Flow:**
+**Flow (interactive):**
 
 1. Detects related files from the working tree and selects a context (`coding` / `frontend` / `backend`)
 2. Prompts for output directory (default: current working directory)
@@ -64,6 +64,24 @@ facet compose
 4. If the target file exists, prompts for overwrite confirmation
 
 The compose context always includes the `coder` persona, `coding` and `ai-antipattern` policies, and `architecture` knowledge. When frontend- or backend-related files are detected, additional knowledge facets are included.
+
+**Non-interactive mode:**
+
+When any of the following options are specified, compose runs without prompts:
+
+```bash
+facet compose --composition <name> --split --output ./out --overwrite
+```
+
+| Option | Description |
+|--------|-------------|
+| `--composition <name>` | Select a composition definition by name |
+| `--split` | Output as split files (system + user) |
+| `--combined` | Output as a single combined file |
+| `--output <dir>` | Output directory (default: current working directory) |
+| `--overwrite` | Overwrite existing files without confirmation |
+
+`--split` and `--combined` are mutually exclusive. For standard (non-template) compose, one of them is required in non-interactive mode. Template-backed compose does not support `--split` or `--combined`.
 
 ### `facet install skill`
 
@@ -79,7 +97,7 @@ facet install skill
 2. Prompts to select a composition
 3. Prompts to select a target:
    - **Claude Code** — installs to `~/.claude/skills/{name}/SKILL.md`
-   - **Codex** — installs to `~/.agents/skills/{name}/SKILL.md`
+   - **Codex** — installs to `~/.agents/skills/{name}/SKILL.md` (configurable via `install.targets.codex.roots` in `config.yaml`)
 4. Copies facet files and generates the skill document
 
 When a composition definition includes a `template` field, install still targets Claude Code or Codex, but it copies the template directory structure and injects facet tokens (`{{facet:persona}}`, `{{facet:knowledges}}`, `{{facet:policies}}`, `{{facet:instructions}}`).
@@ -98,12 +116,13 @@ knowledge:                   # Optional: knowledge facet names or paths
 policies:                    # Optional: policy facet names or paths
   - coding
   - security
-instruction: Review changes. # Optional: inline text or file path
+instructions:                # Optional: instruction facet names, paths, or inline text
+  - review-changes
 template: issue-worktree     # Optional: template directory name
 order:                       # Optional: user-message section order
   - policies
   - knowledge
-  - instruction
+  - instructions
 ```
 
 ### Field resolution
@@ -111,4 +130,4 @@ order:                       # Optional: user-message section order
 - **Facet names** (e.g., `coder`) are resolved from `~/.faceted/facets/{kind}/{name}.md`
 - **File paths** starting with `./`, `../`, `/`, `~` or ending with `.md` are resolved directly
 - **Scope references** (`@owner/repo/name`) are resolved from `~/.faceted/repertoire/`
-- **Inline text** (for `instruction` only) is used directly without file lookup
+- **Inline text** (for `instructions` only) is used directly without file lookup

@@ -137,7 +137,7 @@ order:
 
 - `name` and `persona` are required.
 - `order` controls user-message section order (default: `knowledge` → `instructions` → `policies`).
-- `instructions` is a list of facet file references.
+- `instructions` is a list of facet names, file paths, or inline text.
 
 ## Scope References
 
