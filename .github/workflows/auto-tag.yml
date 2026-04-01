@@ -4,10 +4,16 @@ on:
   pull_request:
     types: [closed]
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish (e.g. v0.4.0)'
+        required: true
 
 jobs:
   tag:
     if: >
+      github.event_name == 'pull_request' &&
       github.event.pull_request.merged == true &&
       startsWith(github.event.pull_request.title, 'Release v') &&
       startsWith(github.event.pull_request.head.ref, 'release/')
@@ -34,11 +40,12 @@ jobs:
 
   publish:
     needs: tag
+    if: always() && (needs.tag.result == 'success' || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.tag.outputs.tag }}
+          ref: ${{ needs.tag.outputs.tag || github.event.inputs.tag }}
 
       - uses: actions/setup-node@v4
         with:
@@ -52,7 +59,7 @@ jobs:
       - name: Determine npm tag
         id: npm-tag
         run: |
-          VERSION="${{ needs.tag.outputs.tag }}"
+          VERSION="${{ needs.tag.outputs.tag || github.event.inputs.tag }}"
           VERSION="${VERSION#v}"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           if echo "$VERSION" | grep -qE '(alpha|beta|rc|next)'; then
