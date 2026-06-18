@@ -48,6 +48,7 @@ describe('buildSectionsWithCopiedPaths', () => {
         knowledges: [],
         policies: ['/target/facets/policies/coding.md'],
         instructions: ['/target/facets/instructions/plain-skill.md'],
+        instructionPartials: [],
       }),
     ).toThrow('Copied knowledge facet count mismatch');
   });
@@ -61,6 +62,7 @@ describe('buildSectionsWithCopiedPaths', () => {
         knowledges: ['/target/facets/knowledge/architecture.md'],
         policies: [],
         instructions: ['/target/facets/instructions/plain-skill.md'],
+        instructionPartials: [],
       }),
     ).toThrow('Copied policy facet count mismatch');
   });

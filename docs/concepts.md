@@ -102,7 +102,7 @@ const result = compose(
       { body: 'Rate severity as Critical/High/Medium/Low.' },
     ],
     knowledge: [{ body: 'The app uses Express.js with Passport auth.' }],
-    instruction: { body: 'Review the authentication middleware.' },
+    instructions: [{ body: 'Review the authentication middleware.' }],
   },
   { contextMaxChars: 8000 },
 );
@@ -125,11 +125,36 @@ facets/
 ├── knowledge/
 │   ├── architecture.md
 │   └── api-design.md
-└── instructions/
-    └── review.md
+├── instructions/
+│   └── review.md
+└── instruction-partials/
+    └── review-common.md
 ```
 
 The `FileDataEngine` resolves facets from this structure using the convention `{root}/{kind}/{key}.md`. The `CompositeDataEngine` layers multiple directories with first-match-wins resolution, enabling project-level facets to override global defaults.
+
+## Instruction Partials
+
+Instruction facets can include reusable Markdown partials for shared task procedure text:
+
+```markdown
+# instructions/review.md
+Review the change for mergeable quality.
+
+{{include:instructions/review-common}}
+```
+
+The include resolves to `facets/instruction-partials/review-common.md` and expands at the include site before the final user message is composed. Instruction partials are shared fragments for instruction facets, not standalone instruction facets resolved by name.
+
+Partial includes are intentionally narrow:
+
+- Only instruction facets expand include tokens.
+- The supported syntax is `{{include:instructions/<name>}}` or `{{include:instructions/@owner/repo/<name>}}`.
+- Shortened syntax such as `{{include:<name>}}` is invalid.
+- Missing partials fail with an explicit error.
+- Cyclic include chains fail with an error that includes the chain.
+
+When local and global faceted roots are both present, instruction partials use the same first-match rule as facets: local `.faceted/facets/instruction-partials/` overrides global `~/.faceted/facets/instruction-partials/`. `composePromptPayload()` records instruction facet source paths in `copyFiles.instructions` and records included partial source paths in `copyFiles.instructionPartials` only when includes are used.
 
 ## Compose Definitions
 
@@ -144,14 +169,15 @@ knowledge:
 policies:
   - coding
   - security
-instruction: Review the latest changes for quality and security issues.
+instructions:
+  - review
 order:
   - policies
   - knowledge
-  - instruction
+  - instructions
 ```
 
-The `instruction` field can be inline text or a path to a Markdown file. Facet names are resolved against the facets directory; file paths (starting with `./`, `../`, `/`, `~`, or ending with `.md`) are resolved directly.
+The `instructions` field is a list of instruction facet names or paths to Markdown files. Facet names are resolved against the facets directory; file paths (starting with `./`, `../`, `/`, `~`, or ending with `.md`) are resolved directly.
 
 ## Scope References
 

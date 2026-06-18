@@ -24,6 +24,7 @@ export interface FacetPathMap {
   readonly knowledges: readonly string[];
   readonly policies: readonly string[];
   readonly instructions: readonly string[];
+  readonly instructionPartials: readonly string[];
 }
 
 function requireFacetPathCount(params: {
@@ -130,6 +131,7 @@ export function buildSectionsWithCopiedPaths(
           ref: basename(instructionPath, '.md'),
           body: instruction.body,
           path: instructionPath,
+          sourcePaths: [instructionPath],
         };
       }
       return instruction;
@@ -148,6 +150,7 @@ export function copyFacetFiles(params: {
   const knowledgeDir = join(facetsDir, 'knowledge');
   const policiesDir = join(facetsDir, 'policies');
   const instructionsDir = join(facetsDir, 'instructions');
+  const instructionPartialsDir = join(facetsDir, 'instruction-partials');
 
   mkdirSync(personaDir, { recursive: true });
   mkdirSync(knowledgeDir, { recursive: true });
@@ -168,6 +171,13 @@ export function copyFacetFiles(params: {
 
   const policyPaths = params.copyFiles.policies.map(path => {
     const targetPath = join(policiesDir, basename(path));
+    copyFileSync(path, targetPath);
+    return targetPath;
+  });
+
+  const instructionPartialPaths = (params.copyFiles.instructionPartials ?? []).map(path => {
+    mkdirSync(instructionPartialsDir, { recursive: true });
+    const targetPath = join(instructionPartialsDir, basename(path));
     copyFileSync(path, targetPath);
     return targetPath;
   });
@@ -199,6 +209,7 @@ export function copyFacetFiles(params: {
     knowledges: knowledgePaths,
     policies: policyPaths,
     instructions: instructionPaths,
+    instructionPartials: instructionPartialPaths,
   };
 }
 

@@ -89,6 +89,7 @@ facet install skill
 │   ├── knowledge/
 │   ├── policies/
 │   ├── instructions/
+│   ├── instruction-partials/
 │   └── compositions/
 └── templates/
 
@@ -99,6 +100,7 @@ facet install skill
 │   ├── knowledge/        # Domain knowledge files
 │   ├── policies/         # Policy/rules files
 │   ├── instructions/     # Instruction files
+│   ├── instruction-partials/ # Reusable instruction-only Markdown partials
 │   └── compositions/     # Compose definition YAML files
 └── templates/            # Skill templates
 ```
@@ -136,8 +138,20 @@ order:
 ```
 
 - `name` and `persona` are required.
-- `order` controls user-message section order (default: `knowledge` → `instructions` → `policies`).
-- `instructions` is a list of facet names, file paths, or inline text.
+- `order` controls user-message section order (default: `knowledge` -> `instructions` -> `policies`).
+- `instructions` is a list of instruction facet names or Markdown file paths.
+
+Instruction facet files can include shared Markdown partials:
+
+```md
+Review the change for mergeable quality.
+
+{{include:instructions/review-common}}
+```
+
+The include above resolves to `facets/instruction-partials/review-common.md` and expands at the include site before prompt composition. Includes are supported only in instruction facets. The supported syntax is `{{include:instructions/<name>}}` for local/global partials and `{{include:instructions/@owner/repo/<name>}}` for repertoire partials; shortened forms such as `{{include:review-common}}` are invalid.
+
+Instruction partials use the same local-first layering as facets: `.faceted/facets/instruction-partials/` is checked before `~/.faceted/facets/instruction-partials/`. Missing includes and cyclic include chains fail with explicit errors. `composePromptPayload().copyFiles.instructions` includes instruction facet paths, and `composePromptPayload().copyFiles.instructionPartials` is present only when included partial paths exist.
 
 ## Scope References
 

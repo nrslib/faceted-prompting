@@ -116,7 +116,7 @@ knowledge:                   # Optional: knowledge facet names or paths
 policies:                    # Optional: policy facet names or paths
   - coding
   - security
-instructions:                # Optional: instruction facet names, paths, or inline text
+instructions:                # Optional: instruction facet names or paths
   - review-changes
 template: issue-worktree     # Optional: template directory name
 order:                       # Optional: user-message section order
@@ -130,4 +130,15 @@ order:                       # Optional: user-message section order
 - **Facet names** (e.g., `coder`) are resolved from `~/.faceted/facets/{kind}/{name}.md`
 - **File paths** starting with `./`, `../`, `/`, `~` or ending with `.md` are resolved directly
 - **Scope references** (`@owner/repo/name`) are resolved from `~/.faceted/repertoire/`
-- **Inline text** (for `instructions` only) is used directly without file lookup
+
+### Instruction partial includes
+
+Instruction facet files may include shared Markdown partials with this syntax:
+
+```md
+{{include:instructions/review-common}}
+```
+
+`{{include:instructions/review-common}}` resolves to `facets/instruction-partials/review-common.md` and expands in place before the composed prompt is written. Repertoire partials use `{{include:instructions/@owner/repo/<name>}}`. The feature is instruction-only; other facet kinds are not expanded. Shortened forms such as `{{include:review-common}}` are rejected.
+
+When both local and global faceted roots are available, partials follow local-first resolution: `.faceted/facets/instruction-partials/` is checked before `~/.faceted/facets/instruction-partials/`. Missing includes and cyclic include chains stop the command with an explicit error. The partial source paths are included in `composePromptPayload().copyFiles.instructionPartials` only when includes are used, so install and copy metadata can keep them separate from standalone instruction facets.

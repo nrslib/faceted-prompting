@@ -51,6 +51,7 @@ export interface CopyFiles {
   readonly knowledge: readonly string[];
   readonly policies: readonly string[];
   readonly instructions: readonly string[];
+  readonly instructionPartials?: readonly string[];
 }
 
 export interface ComposedPromptPayload {

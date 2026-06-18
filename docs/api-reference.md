@@ -13,7 +13,7 @@ import { compose, FileDataEngine, renderTemplate } from 'faceted-prompting';
 Core composition function. Applies the facet placement rule:
 
 - `persona` → `systemPrompt`
-- `policies` + `knowledge` + `instruction` → `userMessage`
+- `policies` + `knowledge` + `instructions` → `userMessage`
 
 ```typescript
 function compose(facets: FacetSet, options: ComposeOptions): ComposedPrompt;
@@ -23,7 +23,7 @@ function compose(facets: FacetSet, options: ComposeOptions): ComposedPrompt;
 
 - `facets` — A `FacetSet` containing resolved facet contents
 - `options.contextMaxChars` — Maximum character length for knowledge/policy content before truncation
-- `options.userMessageOrder` — Optional section order (default: `['policies', 'knowledge', 'instruction']`)
+- `options.userMessageOrder` — Optional section order (default: `['knowledge', 'instructions', 'policies']`)
 
 **Returns:** `ComposedPrompt` with `systemPrompt` and `userMessage` strings.
 
@@ -35,12 +35,17 @@ Higher-level API that composes prompts from a `ComposeDefinition` and returns co
 function composePromptPayload(params: {
   definition: ComposeDefinition;
   definitionDir: string;
-  facetsRoot: string;
+  facetsRoot?: string;
+  facetsRoots?: readonly string[];
   composeOptions: ComposeOptions;
 }): ComposedPromptPayload;
 ```
 
-**Returns:** `ComposedPromptPayload` with `systemPrompt`, `userPrompt`, and `copyFiles` (file paths used for each facet kind).
+Pass `facetsRoots` when composition should resolve facets from more than one root. Roots are checked in order, so callers should pass local roots before global roots. Use `facetsRoot` for single-root composition.
+
+**Returns:** `ComposedPromptPayload` with `systemPrompt`, `userPrompt`, and `copyFiles` (file paths used for each facet kind). `copyFiles.instructions` includes instruction facet paths, and `copyFiles.instructionPartials` is present only when instruction partial paths are expanded from `{{include:instructions/<name>}}` or `{{include:instructions/@owner/repo/<name>}}`.
+
+Instruction partial includes are expanded while resolving compose-definition instructions, before `compose()` receives the resolved `FacetSet`. A token such as `{{include:instructions/review-common}}` resolves to `facets/instruction-partials/review-common.md` under the first matching facets root. A token such as `{{include:instructions/@owner/repo/review-common}}` resolves from repertoire scope packages. Missing partials, empty include names, invalid shortened syntax such as `{{include:review-common}}`, and cyclic include chains throw errors instead of leaving unresolved tokens in the prompt.
 
 ## Types
 
@@ -66,7 +71,7 @@ interface FacetSet {
   readonly persona?: FacetContent;
   readonly policies?: readonly FacetContent[];
   readonly knowledge?: readonly FacetContent[];
-  readonly instruction?: FacetContent;
+  readonly instructions?: readonly FacetContent[];
 }
 ```
 
@@ -97,6 +102,7 @@ interface CopyFiles {
   readonly knowledge: readonly string[];
   readonly policies: readonly string[];
   readonly instructions: readonly string[];
+  readonly instructionPartials?: readonly string[];
 }
 ```
 
@@ -119,7 +125,7 @@ interface ComposeDefinition {
   readonly template?: string;
   readonly knowledge?: readonly string[];
   readonly policies?: readonly string[];
-  readonly instruction?: string;
+  readonly instructions?: readonly string[];
   readonly order?: readonly ComposeOrderEntry[];
 }
 ```

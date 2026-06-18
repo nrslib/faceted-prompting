@@ -31,6 +31,19 @@ describe('compose', () => {
     expect(result.userMessage).toBe('Implement feature X.');
   });
 
+  it('should compose every instruction from the instructions array', () => {
+    const facets: FacetSet = {
+      instructions: [
+        { body: 'Review the plan.' },
+        { body: 'Implement the change.' },
+      ],
+    };
+
+    const result = compose(facets, defaultOptions);
+
+    expect(result.userMessage).toBe('Review the plan.\n\nImplement the change.');
+  });
+
   it('should place policy in userMessage with conflict notice', () => {
     const facets: FacetSet = {
       policies: [{ body: 'Follow clean code principles.' }],

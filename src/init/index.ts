@@ -2,7 +2,14 @@ import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { ensureConfigFile, getFacetedRoot } from '../config/index.js';
 
-const REQUIRED_FACET_DIRS = ['persona', 'knowledge', 'policies', 'instructions', 'output-contracts'] as const;
+const REQUIRED_FACET_DIRS = [
+  'persona',
+  'knowledge',
+  'policies',
+  'instructions',
+  'instruction-partials',
+  'output-contracts',
+] as const;
 const TAKT_BOOTSTRAP_BASE_URL = 'https://raw.githubusercontent.com/nrslib/takt/main/builtins/ja/facets';
 
 function makeComposition(name: string, description: string, knowledge: readonly string[]): string {

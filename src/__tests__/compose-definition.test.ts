@@ -75,7 +75,7 @@ describe('loadComposeDefinition', () => {
         'policies:',
         '  - quality',
         'instructions:',
-        '  - Prepare release notes.',
+        '  - release-notes',
         'order:',
         '  - persona',
         '  - policies',
@@ -88,10 +88,32 @@ describe('loadComposeDefinition', () => {
     const { loadComposeDefinition } = await loadComposeDefinitionModule();
     const loaded = await loadComposeDefinition(definitionPath);
     expect(loaded.name).toBe('release-note');
+    expect(loaded.order).toEqual(['policies', 'knowledge', 'instructions']);
     expect(loaded.description).toBeUndefined();
     expect(loaded.persona).toBe('coder');
-    expect(loaded.instructions).toEqual(['Prepare release notes.']);
-    expect(loaded.order).toEqual(['policies', 'knowledge', 'instructions']);
+    expect(loaded.instructions).toEqual(['release-notes']);
+  });
+
+  it('should reject output-contracts compose definition keys for instruction include scope', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'facet-compose-def-'));
+    tempDirs.push(root);
+
+    const definitionPath = join(root, 'definition.yaml');
+    writeFileSync(
+      definitionPath,
+      [
+        'name: release-note',
+        'persona: coder',
+        'output-contracts:',
+        '  - release-report',
+      ].join('\n'),
+      'utf-8',
+    );
+
+    const { loadComposeDefinition } = await loadComposeDefinitionModule();
+    await expect(loadComposeDefinition(definitionPath)).rejects.toThrow(
+      'Unknown compose definition key: output-contracts',
+    );
   });
 
   it('should parse instructions as list', async () => {
