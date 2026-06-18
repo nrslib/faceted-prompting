@@ -13,7 +13,8 @@ type ComposeDefinitionModule = {
     knowledge?: string[];
     policies?: string[];
     instructions?: string[];
-    order?: Array<'knowledge' | 'policies' | 'instructions'>;
+    outputContracts?: string[];
+    order?: Array<'knowledge' | 'policies' | 'instructions' | 'output-contracts'>;
   }>;
 };
 
@@ -52,7 +53,7 @@ describe('loadComposeDefinition', () => {
     await expect(loadComposeDefinition(definitionPath)).rejects.toThrow('name');
   });
 
-  it('should keep description optional and preserve non-persona order entries', async () => {
+  it('should keep description optional and preserve order entries', async () => {
     const root = mkdtempSync(join(tmpdir(), 'facet-compose-def-'));
     tempDirs.push(root);
 
@@ -77,7 +78,6 @@ describe('loadComposeDefinition', () => {
         'instructions:',
         '  - Prepare release notes.',
         'order:',
-        '  - persona',
         '  - policies',
         '  - knowledge',
         '  - instructions',
@@ -92,6 +92,32 @@ describe('loadComposeDefinition', () => {
     expect(loaded.persona).toBe('coder');
     expect(loaded.instructions).toEqual(['Prepare release notes.']);
     expect(loaded.order).toEqual(['policies', 'knowledge', 'instructions']);
+  });
+
+  it('should reject persona in order entries', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'facet-compose-def-'));
+    tempDirs.push(root);
+
+    const definitionPath = join(root, 'definition.yaml');
+    writeFileSync(
+      definitionPath,
+      [
+        'name: release-note',
+        'persona: coder',
+        'output-contracts:',
+        '  - review-report',
+        'policies:',
+        '  - quality',
+        'order:',
+        '  - persona',
+        '  - output-contracts',
+        '  - policies',
+      ].join('\n'),
+      'utf-8',
+    );
+
+    const { loadComposeDefinition } = await loadComposeDefinitionModule();
+    await expect(loadComposeDefinition(definitionPath)).rejects.toThrow('Invalid compose order entry: persona');
   });
 
   it('should parse instructions as list', async () => {
@@ -114,6 +140,77 @@ describe('loadComposeDefinition', () => {
     const { loadComposeDefinition } = await loadComposeDefinitionModule();
     const loaded = await loadComposeDefinition(definitionPath);
     expect(loaded.instructions).toEqual(['generation-steps', 'self-check']);
+  });
+
+  it('should parse output-contracts as list and keep it orderable', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'facet-compose-def-'));
+    tempDirs.push(root);
+
+    const definitionPath = join(root, 'definition.yaml');
+    writeFileSync(
+      definitionPath,
+      [
+        'name: report-writer',
+        'persona: coder',
+        'instructions:',
+        '  - implement',
+        'output-contracts:',
+        '  - test-report',
+        '  - summary',
+        'policies:',
+        '  - coding',
+        'order:',
+        '  - instructions',
+        '  - output-contracts',
+        '  - policies',
+      ].join('\n'),
+      'utf-8',
+    );
+
+    const { loadComposeDefinition } = await loadComposeDefinitionModule();
+    const loaded = await loadComposeDefinition(definitionPath);
+    expect(loaded.outputContracts).toEqual(['test-report', 'summary']);
+    expect(loaded.order).toEqual(['instructions', 'output-contracts', 'policies']);
+  });
+
+  it('should reject non-list output-contracts field', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'facet-compose-def-'));
+    tempDirs.push(root);
+
+    const definitionPath = join(root, 'definition.yaml');
+    writeFileSync(
+      definitionPath,
+      [
+        'name: report-writer',
+        'persona: coder',
+        'output-contracts: test-report',
+      ].join('\n'),
+      'utf-8',
+    );
+
+    const { loadComposeDefinition } = await loadComposeDefinitionModule();
+    await expect(loadComposeDefinition(definitionPath)).rejects.toThrow('output-contracts must be a YAML list');
+  });
+
+  it('should reject non-string output-contracts entries', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'facet-compose-def-'));
+    tempDirs.push(root);
+
+    const definitionPath = join(root, 'definition.yaml');
+    writeFileSync(
+      definitionPath,
+      [
+        'name: report-writer',
+        'persona: coder',
+        'output-contracts:',
+        '  - test-report',
+        '  - name: invalid',
+      ].join('\n'),
+      'utf-8',
+    );
+
+    const { loadComposeDefinition } = await loadComposeDefinitionModule();
+    await expect(loadComposeDefinition(definitionPath)).rejects.toThrow('output-contracts must contain only strings');
   });
 
   it('should parse optional template field', async () => {

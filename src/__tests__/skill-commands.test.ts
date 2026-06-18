@@ -9,6 +9,7 @@ function createSections(): Omit<SkillDocumentInput, 'mode'> {
       persona: 'coder',
       knowledge: ['architecture'],
       policies: ['coding'],
+      outputContracts: ['test-report'],
     },
     persona: {
       ref: 'coder',
@@ -27,6 +28,13 @@ function createSections(): Omit<SkillDocumentInput, 'mode'> {
         ref: 'coding',
         body: 'Never hide errors.',
         path: '/original/facets/policies/coding.md',
+      },
+    ],
+    outputContracts: [
+      {
+        ref: 'test-report',
+        body: 'Write test-report.md.',
+        path: '/original/facets/output-contracts/test-report.md',
       },
     ],
     instructions: [
@@ -48,6 +56,7 @@ describe('buildSectionsWithCopiedPaths', () => {
         knowledges: [],
         policies: ['/target/facets/policies/coding.md'],
         instructions: ['/target/facets/instructions/plain-skill.md'],
+        outputContracts: ['/target/facets/output-contracts/test-report.md'],
       }),
     ).toThrow('Copied knowledge facet count mismatch');
   });
@@ -61,7 +70,42 @@ describe('buildSectionsWithCopiedPaths', () => {
         knowledges: ['/target/facets/knowledge/architecture.md'],
         policies: [],
         instructions: ['/target/facets/instructions/plain-skill.md'],
+        outputContracts: ['/target/facets/output-contracts/test-report.md'],
       }),
     ).toThrow('Copied policy facet count mismatch');
+  });
+
+  it('should throw when copied output-contracts facets count does not match source sections', () => {
+    const sections = createSections();
+
+    expect(() =>
+      buildSectionsWithCopiedPaths(sections, {
+        persona: '/target/facets/persona/coder.md',
+        knowledges: ['/target/facets/knowledge/architecture.md'],
+        policies: ['/target/facets/policies/coding.md'],
+        instructions: ['/target/facets/instructions/plain-skill.md'],
+        outputContracts: [],
+      }),
+    ).toThrow('Copied output-contracts facet count mismatch');
+  });
+
+  it('should replace output-contracts section paths with copied paths', () => {
+    const sections = createSections();
+
+    const copied = buildSectionsWithCopiedPaths(sections, {
+      persona: '/target/facets/persona/coder.md',
+      knowledges: ['/target/facets/knowledge/architecture.md'],
+      policies: ['/target/facets/policies/coding.md'],
+      instructions: ['/target/facets/instructions/plain-skill.md'],
+      outputContracts: ['/target/facets/output-contracts/test-report.md'],
+    });
+
+    expect(copied.outputContracts).toEqual([
+      {
+        ref: 'test-report',
+        body: 'Write test-report.md.',
+        path: '/target/facets/output-contracts/test-report.md',
+      },
+    ]);
   });
 });

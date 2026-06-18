@@ -24,10 +24,11 @@ export interface FacetPathMap {
   readonly knowledges: readonly string[];
   readonly policies: readonly string[];
   readonly instructions: readonly string[];
+  readonly outputContracts: readonly string[];
 }
 
 function requireFacetPathCount(params: {
-  readonly label: 'knowledge' | 'policy';
+  readonly label: 'knowledge' | 'policy' | 'output-contracts';
   readonly expected: number;
   readonly actual: number;
 }): void {
@@ -39,7 +40,7 @@ function requireFacetPathCount(params: {
 }
 
 function requireFacetPathAtIndex(params: {
-  readonly label: 'knowledge' | 'policy';
+  readonly label: 'knowledge' | 'policy' | 'output-contracts';
   readonly paths: readonly string[];
   readonly index: number;
 }): string {
@@ -60,6 +61,7 @@ export function buildInlineFacetTokenValues(sections: SkillSections): FacetToken
     knowledges: sections.knowledge.map(knowledge => knowledge.body).join('\n'),
     policies: sections.policies.map(policy => policy.body).join('\n'),
     instructions: sections.instructions.map(instruction => instruction.body).join('\n'),
+    outputContracts: sections.outputContracts.map(outputContract => outputContract.body).join('\n'),
   };
 }
 
@@ -100,6 +102,11 @@ export function buildSectionsWithCopiedPaths(
     expected: sections.policies.length,
     actual: facets.policies.length,
   });
+  requireFacetPathCount({
+    label: 'output-contracts',
+    expected: sections.outputContracts.length,
+    actual: facets.outputContracts.length,
+  });
 
   return {
     ...sections,
@@ -134,6 +141,14 @@ export function buildSectionsWithCopiedPaths(
       }
       return instruction;
     }),
+    outputContracts: sections.outputContracts.map((outputContract, index) => ({
+      ...outputContract,
+      path: requireFacetPathAtIndex({
+        label: 'output-contracts',
+        paths: facets.outputContracts,
+        index,
+      }),
+    })),
   };
 }
 
@@ -148,10 +163,12 @@ export function copyFacetFiles(params: {
   const knowledgeDir = join(facetsDir, 'knowledge');
   const policiesDir = join(facetsDir, 'policies');
   const instructionsDir = join(facetsDir, 'instructions');
+  const outputContractsDir = join(facetsDir, 'output-contracts');
 
   mkdirSync(personaDir, { recursive: true });
   mkdirSync(knowledgeDir, { recursive: true });
   mkdirSync(policiesDir, { recursive: true });
+  mkdirSync(outputContractsDir, { recursive: true });
 
   const sourcePersonaPath = params.copyFiles.persona[0];
   if (!sourcePersonaPath) {
@@ -168,6 +185,12 @@ export function copyFacetFiles(params: {
 
   const policyPaths = params.copyFiles.policies.map(path => {
     const targetPath = join(policiesDir, basename(path));
+    copyFileSync(path, targetPath);
+    return targetPath;
+  });
+
+  const outputContractPaths = params.copyFiles.outputContracts.map(path => {
+    const targetPath = join(outputContractsDir, basename(path));
     copyFileSync(path, targetPath);
     return targetPath;
   });
@@ -199,6 +222,7 @@ export function copyFacetFiles(params: {
     knowledges: knowledgePaths,
     policies: policyPaths,
     instructions: instructionPaths,
+    outputContracts: outputContractPaths,
   };
 }
 

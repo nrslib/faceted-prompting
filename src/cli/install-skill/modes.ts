@@ -80,6 +80,7 @@ export async function runSkillDeployInstall(params: {
   const payload = composePromptPayload({
     definition: params.definition,
     definitionDir: params.definitionDir,
+    facetedRoots: params.facetedRoots,
     facetsRoots: params.facetsRoots,
     composeOptions: { contextMaxChars: 8000 },
   });

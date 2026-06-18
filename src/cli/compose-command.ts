@@ -24,6 +24,7 @@ export async function runComposeCommand(
 
   return runStandardCompose({
     options,
+    facetedRoots: resolved.facetedRoots,
     facetsRoots: resolved.facetsRoots,
     definitionPath: resolved.definitionPath,
     definition: resolved.definition,

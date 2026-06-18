@@ -12,6 +12,8 @@ export type {
   FacetSet,
   ComposedPrompt,
   ComposedPromptPayload,
+  ComposeDefinition,
+  ComposeOrderEntry,
   ComposeOptions,
   CopyFiles,
 } from './types.js';

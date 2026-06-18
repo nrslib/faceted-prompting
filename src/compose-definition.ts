@@ -10,10 +10,11 @@ const ALLOWED_COMPOSE_KEYS = new Set([
   'knowledge',
   'policies',
   'instructions',
+  'output-contracts',
   'order',
 ]);
 
-const ORDER_VALUES = new Set(['persona', 'knowledge', 'policies', 'instructions']);
+const ORDER_VALUES = new Set(['knowledge', 'policies', 'instructions', 'output-contracts']);
 
 function normalizeOrder(rawOrder: string[] | undefined): ComposeOrderEntry[] | undefined {
   if (!rawOrder) return undefined;
@@ -23,7 +24,6 @@ function normalizeOrder(rawOrder: string[] | undefined): ComposeOrderEntry[] | u
     if (!ORDER_VALUES.has(entry)) {
       throw new Error(`Invalid compose order entry: ${entry}`);
     }
-    if (entry === 'persona') continue;
     const typedEntry = entry as ComposeOrderEntry;
     if (seen.has(typedEntry)) continue;
     seen.add(typedEntry);
@@ -98,6 +98,7 @@ export async function loadComposeDefinition(definitionPath: string): Promise<Com
 
   const knowledge = ensureStringList(parsed.knowledge, 'knowledge');
   const policies = ensureStringList(parsed.policies, 'policies');
+  const outputContracts = ensureStringList(parsed['output-contracts'], 'output-contracts');
   const rawOrder = ensureStringList(parsed.order, 'order');
   const order = normalizeOrder(rawOrder);
 
@@ -109,6 +110,7 @@ export async function loadComposeDefinition(definitionPath: string): Promise<Com
     knowledge: knowledge && knowledge.length > 0 ? knowledge : undefined,
     policies: policies && policies.length > 0 ? policies : undefined,
     instructions: instructions && instructions.length > 0 ? instructions : undefined,
+    outputContracts: outputContracts && outputContracts.length > 0 ? outputContracts : undefined,
     order,
   };
 }

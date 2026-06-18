@@ -19,7 +19,9 @@ npm install -g faceted-prompting
 │   ├── persona/                 # Persona Markdown files
 │   ├── knowledge/               # Knowledge files
 │   ├── policies/                # Policy/rules files
-│   └── compositions/            # Compose definition YAML files
+│   ├── instructions/            # Instruction files
+│   └── output-contracts/        # Output/report format files
+├── compositions/                # Compose definition YAML files
 ├── templates/                   # Skill install templates
 └── repertoire/                  # Installed scope packages
 ```
@@ -100,7 +102,7 @@ facet install skill
    - **Codex** — installs to `~/.agents/skills/{name}/SKILL.md` (configurable via `install.targets.codex.roots` in `config.yaml`)
 4. Copies facet files and generates the skill document
 
-When a composition definition includes a `template` field, install still targets Claude Code or Codex, but it copies the template directory structure and injects facet tokens (`{{facet:persona}}`, `{{facet:knowledges}}`, `{{facet:policies}}`, `{{facet:instructions}}`).
+When a composition definition includes a `template` field, install still targets Claude Code or Codex, but it copies the template directory structure and injects facet tokens (`{{facet:persona}}`, `{{facet:knowledges}}`, `{{facet:policies}}`, `{{facet:instructions}}`, `{{facet:outputContracts}}`).
 
 ## Compose Definition Format
 
@@ -116,18 +118,23 @@ knowledge:                   # Optional: knowledge facet names or paths
 policies:                    # Optional: policy facet names or paths
   - coding
   - security
-instructions:                # Optional: instruction facet names, paths, or inline text
+instructions:                # Optional: instruction facet names, paths, or scope refs
   - review-changes
+output-contracts:            # Optional: output contract facet names, paths, or scope refs
+  - review-report
 template: issue-worktree     # Optional: template directory name
 order:                       # Optional: user-message section order
-  - policies
   - knowledge
   - instructions
+  - output-contracts
+  - policies
 ```
 
 ### Field resolution
 
-- **Facet names** (e.g., `coder`) are resolved from `~/.faceted/facets/{kind}/{name}.md`
-- **File paths** starting with `./`, `../`, `/`, `~` or ending with `.md` are resolved directly
-- **Scope references** (`@owner/repo/name`) are resolved from `~/.faceted/repertoire/`
-- **Inline text** (for `instructions` only) is used directly without file lookup
+- **Facet names** (e.g., `coder`) are resolved from the configured facets roots at `facets/{kind}/{name}.md`
+- **File paths** starting with `./`, `../`, `/`, `~` or ending with `.md` are resolved relative to the compose definition directory for relative paths
+- **File path boundaries** require the real path to stay inside the compose definition directory or configured facets roots; symlinks and paths outside those roots fail
+- **Scope references** (`@owner/repo/name`) require repertoire roots and resolve from `~/.faceted/repertoire/`
+
+If `order` is omitted, the user-message section order is `knowledge`, `instructions`, `output-contracts`, then `policies`. The YAML key is `output-contracts`; the TypeScript API exposes it as `outputContracts`.
