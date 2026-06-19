@@ -3,6 +3,7 @@ import { dirname, join } from 'node:path';
 import { isResourcePath, resolveResourcePath } from '../resolve.js';
 import { ensurePathWithinRoots } from './path-guard.js';
 import { expandInstructionIncludes } from './instruction-includes.js';
+import { instructionPartialsDir } from '../instruction-partial-paths.js';
 import type { ComposeDefinition, FacetSet } from '../types.js';
 import type {
   InstructionSection,
@@ -154,7 +155,7 @@ export function resolveDefinitionSections(params: {
       }
       const expanded = expandInstructionIncludes({
         body: resolved.body,
-        partialDirs: facetsRoots.map(facetsRoot => join(facetsRoot, 'instruction-partials')),
+        partialDirs: facetsRoots.map(facetsRoot => instructionPartialsDir(facetsRoot)),
         repertoireDirs: repertoireRoots,
         allowedRoots: includeAllowedRoots,
       });

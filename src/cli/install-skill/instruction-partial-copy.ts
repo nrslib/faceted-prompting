@@ -1,4 +1,5 @@
 import { basename, join } from 'node:path';
+import { INSTRUCTION_PARTIALS_FACET_DIR } from '../../instruction-partial-paths.js';
 
 function scopedInstructionPartialSegments(sourcePath: string): readonly string[] | undefined {
   const segments = sourcePath.split(/[\\/]+/u);
@@ -11,12 +12,20 @@ function scopedInstructionPartialSegments(sourcePath: string): readonly string[]
   const repo = segments[repertoireIndex + 2];
   const facets = segments[repertoireIndex + 3];
   const partials = segments[repertoireIndex + 4];
-  const fileName = segments[repertoireIndex + 5];
-  if (!owner?.startsWith('@') || !repo || facets !== 'facets' || partials !== 'instruction-partials' || !fileName) {
+  const instructions = segments[repertoireIndex + 5];
+  const fileName = segments[repertoireIndex + 6];
+  if (
+    !owner?.startsWith('@') ||
+    !repo ||
+    facets !== 'facets' ||
+    partials !== 'partials' ||
+    instructions !== 'instructions' ||
+    !fileName
+  ) {
     return undefined;
   }
 
-  return [owner, repo, facets, partials, fileName];
+  return [owner, repo, facets, ...INSTRUCTION_PARTIALS_FACET_DIR.split('/'), fileName];
 }
 
 export function instructionPartialTargetPath(params: {

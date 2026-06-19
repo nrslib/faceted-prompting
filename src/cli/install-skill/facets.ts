@@ -17,6 +17,7 @@ import {
 import { hasFacetToken, replaceFacetTokens } from './facet-token-renderer.js';
 import type { FacetTokenValues } from './facet-token-renderer.js';
 import { instructionPartialTargetPath } from './instruction-partial-copy.js';
+import { instructionPartialsDir } from '../../instruction-partial-paths.js';
 
 export type SkillSections = ReturnType<typeof buildSkillSections>;
 
@@ -151,7 +152,7 @@ export function copyFacetFiles(params: {
   const knowledgeDir = join(facetsDir, 'knowledge');
   const policiesDir = join(facetsDir, 'policies');
   const instructionsDir = join(facetsDir, 'instructions');
-  const instructionPartialsDir = join(facetsDir, 'instruction-partials');
+  const partialsDir = instructionPartialsDir(facetsDir);
 
   mkdirSync(personaDir, { recursive: true });
   mkdirSync(knowledgeDir, { recursive: true });
@@ -180,7 +181,7 @@ export function copyFacetFiles(params: {
     const targetPath = instructionPartialTargetPath({
       sourcePath: path,
       targetDir: params.targetDir,
-      instructionPartialsDir,
+      instructionPartialsDir: partialsDir,
     });
     mkdirSync(dirname(targetPath), { recursive: true });
     copyFileSync(path, targetPath);

@@ -49,10 +49,10 @@ describe('composePromptPayload instruction partial includes', () => {
   it('should expand instruction partial includes at the include site and preserve source metadata', () => {
     const rootDir = createRootDir();
     const facetsRoot = createBasicFacets(rootDir);
-    mkdirSync(join(facetsRoot, 'instruction-partials'), { recursive: true });
+    mkdirSync(join(facetsRoot, 'partials/instructions'), { recursive: true });
 
     const instructionPath = join(facetsRoot, 'instructions', 'review-coding.md');
-    const partialPath = join(facetsRoot, 'instruction-partials', 'review-common.md');
+    const partialPath = join(facetsRoot, 'partials/instructions', 'review-common.md');
     writeFileSync(
       instructionPath,
       [
@@ -83,9 +83,9 @@ describe('composePromptPayload instruction partial includes', () => {
   it('should keep inline instruction text as prompt content without include expansion', () => {
     const rootDir = createRootDir();
     const facetsRoot = createBasicFacets(rootDir);
-    mkdirSync(join(facetsRoot, 'instruction-partials'), { recursive: true });
+    mkdirSync(join(facetsRoot, 'partials/instructions'), { recursive: true });
     writeFileSync(
-      join(facetsRoot, 'instruction-partials', 'review-common.md'),
+      join(facetsRoot, 'partials/instructions', 'review-common.md'),
       'This partial must not be expanded from inline text.',
       'utf-8',
     );
@@ -130,11 +130,11 @@ describe('composePromptPayload instruction partial includes', () => {
   it('should include nested instruction partial paths in copy metadata', () => {
     const rootDir = createRootDir();
     const facetsRoot = createBasicFacets(rootDir);
-    mkdirSync(join(facetsRoot, 'instruction-partials'), { recursive: true });
+    mkdirSync(join(facetsRoot, 'partials/instructions'), { recursive: true });
 
     const instructionPath = join(facetsRoot, 'instructions', 'review-coding.md');
-    const commonPath = join(facetsRoot, 'instruction-partials', 'review-common.md');
-    const evidencePath = join(facetsRoot, 'instruction-partials', 'review-evidence.md');
+    const commonPath = join(facetsRoot, 'partials/instructions', 'review-common.md');
+    const evidencePath = join(facetsRoot, 'partials/instructions', 'review-evidence.md');
     writeFileSync(instructionPath, 'Before\n{{include:instructions/review-common}}\nAfter', 'utf-8');
     writeFileSync(commonPath, 'Common start\n{{include:instructions/review-evidence}}\nCommon end', 'utf-8');
     writeFileSync(evidencePath, 'Review execution evidence.', 'utf-8');
@@ -158,10 +158,10 @@ describe('composePromptPayload instruction partial includes', () => {
     const rootDir = createRootDir();
     const localFacetsRoot = join(rootDir, 'local', 'facets');
     const globalFacetsRoot = join(rootDir, 'global', 'facets');
-    mkdirSync(join(localFacetsRoot, 'instruction-partials'), { recursive: true });
+    mkdirSync(join(localFacetsRoot, 'partials/instructions'), { recursive: true });
     mkdirSync(join(globalFacetsRoot, 'persona'), { recursive: true });
     mkdirSync(join(globalFacetsRoot, 'instructions'), { recursive: true });
-    mkdirSync(join(globalFacetsRoot, 'instruction-partials'), { recursive: true });
+    mkdirSync(join(globalFacetsRoot, 'partials/instructions'), { recursive: true });
 
     writeFileSync(join(globalFacetsRoot, 'persona', 'coder.md'), 'You are a global coding agent.', 'utf-8');
     writeFileSync(
@@ -170,12 +170,12 @@ describe('composePromptPayload instruction partial includes', () => {
       'utf-8',
     );
     writeFileSync(
-      join(globalFacetsRoot, 'instruction-partials', 'review-common.md'),
+      join(globalFacetsRoot, 'partials/instructions', 'review-common.md'),
       'Global common review text.',
       'utf-8',
     );
     writeFileSync(
-      join(localFacetsRoot, 'instruction-partials', 'review-common.md'),
+      join(localFacetsRoot, 'partials/instructions', 'review-common.md'),
       'Local common review text.',
       'utf-8',
     );
@@ -207,7 +207,7 @@ describe('composePromptPayload instruction partial includes', () => {
       '@acme',
       'review-pack',
       'facets',
-      'instruction-partials',
+      'partials/instructions',
       'review-common.md',
     );
     mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
@@ -248,7 +248,7 @@ describe('composePromptPayload instruction partial includes', () => {
       '@acme',
       'review-pack',
       'facets',
-      'instruction-partials',
+      'partials/instructions',
       'review-common.md',
     );
     const policyPath = join(
@@ -373,11 +373,11 @@ describe('composePromptPayload instruction partial includes', () => {
   it('should fail with the include chain when instruction partial includes are cyclic', () => {
     const rootDir = createRootDir();
     const facetsRoot = createBasicFacets(rootDir);
-    mkdirSync(join(facetsRoot, 'instruction-partials'), { recursive: true });
+    mkdirSync(join(facetsRoot, 'partials/instructions'), { recursive: true });
 
     writeFileSync(join(facetsRoot, 'instructions', 'review-coding.md'), '{{include:instructions/first}}', 'utf-8');
-    writeFileSync(join(facetsRoot, 'instruction-partials', 'first.md'), '{{include:instructions/second}}', 'utf-8');
-    writeFileSync(join(facetsRoot, 'instruction-partials', 'second.md'), '{{include:instructions/first}}', 'utf-8');
+    writeFileSync(join(facetsRoot, 'partials/instructions', 'first.md'), '{{include:instructions/second}}', 'utf-8');
+    writeFileSync(join(facetsRoot, 'partials/instructions', 'second.md'), '{{include:instructions/first}}', 'utf-8');
 
     expect(() =>
       createPayload({ rootDir, facetsRoot, instructions: ['review-coding'] }),

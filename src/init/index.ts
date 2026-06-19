@@ -1,13 +1,14 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { ensureConfigFile, getFacetedRoot } from '../config/index.js';
+import { INSTRUCTION_PARTIALS_FACET_DIR } from '../instruction-partial-paths.js';
 
 const REQUIRED_FACET_DIRS = [
   'persona',
   'knowledge',
   'policies',
   'instructions',
-  'instruction-partials',
+  INSTRUCTION_PARTIALS_FACET_DIR,
   'output-contracts',
 ] as const;
 const TAKT_BOOTSTRAP_BASE_URL = 'https://raw.githubusercontent.com/nrslib/takt/main/builtins/ja/facets';

@@ -84,7 +84,7 @@ function createTemplateBackedSkillFixture(homeDir: string): void {
   mkdirSync(join(facetsRoot, 'policies'), { recursive: true });
   mkdirSync(join(facetsRoot, 'knowledge'), { recursive: true });
   mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
-  mkdirSync(join(facetsRoot, 'instruction-partials'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'partials/instructions'), { recursive: true });
   mkdirSync(compositionsRoot, { recursive: true });
   mkdirSync(templateRoot, { recursive: true });
 
@@ -98,7 +98,7 @@ function createTemplateBackedSkillFixture(homeDir: string): void {
     'utf-8',
   );
   writeFileSync(
-    join(facetsRoot, 'instruction-partials', 'review-common.md'),
+    join(facetsRoot, 'partials/instructions', 'review-common.md'),
     'Review template evidence before reporting.',
     'utf-8',
   );
@@ -244,7 +244,7 @@ describe('facet skill integration flow', () => {
 
     const facetsRoot = join(homeDir, '.faceted', 'facets');
     mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
-    mkdirSync(join(facetsRoot, 'instruction-partials'), { recursive: true });
+    mkdirSync(join(facetsRoot, 'partials/instructions'), { recursive: true });
     writeFileSync(
       join(compositionsRoot, 'coding.yaml'),
       [
@@ -270,7 +270,7 @@ describe('facet skill integration flow', () => {
       'utf-8',
     );
     writeFileSync(
-      join(facetsRoot, 'instruction-partials', 'review-common.md'),
+      join(facetsRoot, 'partials/instructions', 'review-common.md'),
       'Review the original task requirements and execution evidence.',
       'utf-8',
     );
@@ -293,7 +293,7 @@ describe('facet skill integration flow', () => {
       existsSync(join(homeDir, '.claude', 'skills', 'coding', 'facets', 'instructions', 'keep-changes-small.md')),
     ).toBe(true);
     expect(
-      existsSync(join(homeDir, '.claude', 'skills', 'coding', 'facets', 'instruction-partials', 'review-common.md')),
+      existsSync(join(homeDir, '.claude', 'skills', 'coding', 'facets', 'partials/instructions', 'review-common.md')),
     ).toBe(true);
     expect(
       existsSync(join(homeDir, '.claude', 'skills', 'coding', 'facets', 'instructions', 'review-common.md')),
@@ -314,7 +314,7 @@ describe('facet skill integration flow', () => {
       '@acme',
       'review-pack',
       'facets',
-      'instruction-partials',
+      'partials/instructions',
       'review-common.md',
     );
     mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
@@ -367,12 +367,12 @@ describe('facet skill integration flow', () => {
       '@acme',
       'review-pack',
       'facets',
-      'instruction-partials',
+      'partials/instructions',
       'review-common.md',
     );
     expect(result).toEqual({ kind: 'path', path: skillOutputPath });
     expect(existsSync(copiedScopedPartialPath)).toBe(true);
-    expect(existsSync(join(copiedFacetsRoot, 'instruction-partials', 'review-common.md'))).toBe(false);
+    expect(existsSync(join(copiedFacetsRoot, 'partials/instructions', 'review-common.md'))).toBe(false);
 
     const recomposed = composePromptPayload({
       definition: {
@@ -415,7 +415,7 @@ describe('facet skill integration flow', () => {
     expect(skillBody).toContain('Review template evidence before reporting.');
     expect(skillBody).not.toContain('{{include:instructions/review-common}}');
     expect(
-      existsSync(join(homeDir, '.claude', 'skills', 'templated', 'facets', 'instruction-partials', 'review-common.md')),
+      existsSync(join(homeDir, '.claude', 'skills', 'templated', 'facets', 'partials/instructions', 'review-common.md')),
     ).toBe(true);
     expect(
       existsSync(join(homeDir, '.claude', 'skills', 'templated', 'facets', 'instructions', 'review-common.md')),

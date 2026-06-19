@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { isScopeRef, parseScopeRef, resolveScopeRef } from '../scope.js';
 import { ensurePathWithinRoots } from './path-guard.js';
+import { INSTRUCTION_PARTIALS_FACET_DIR } from '../instruction-partial-paths.js';
 
 const INCLUDE_TOKEN_PATTERN = /\{\{\s*include\s*:\s*([^}]*)\}\}/gu;
 const INSTRUCTION_INCLUDE_REF_PATTERN = /^instructions\/([A-Za-z0-9._-]+)$/u;
@@ -64,7 +65,7 @@ function resolveScopedInstructionPartial(params: {
 }): ResolvedInstructionPartial {
   const parsed = parseScopeRef(params.scopeRef);
   const candidatePaths = params.repertoireDirs.map(repertoireDir =>
-    resolveScopeRef(parsed, 'instruction-partials', repertoireDir),
+    resolveScopeRef(parsed, INSTRUCTION_PARTIALS_FACET_DIR, repertoireDir),
   );
 
   const candidatePath = candidatePaths.find(path => existsSync(path));

@@ -127,8 +127,9 @@ facets/
 │   └── api-design.md
 ├── instructions/
 │   └── review.md
-└── instruction-partials/
-    └── review-common.md
+└── partials/
+    └── instructions/
+        └── review-common.md
 ```
 
 The `FileDataEngine` resolves facets from this structure using the convention `{root}/{kind}/{key}.md`. The `CompositeDataEngine` layers multiple directories with first-match-wins resolution, enabling project-level facets to override global defaults.
@@ -144,7 +145,7 @@ Review the change for mergeable quality.
 {{include:instructions/review-common}}
 ```
 
-The include resolves to `facets/instruction-partials/review-common.md` and expands at the include site before the final user message is composed. Instruction partials are shared fragments for instruction facets, not standalone instruction facets resolved by name.
+The include resolves to `facets/partials/instructions/review-common.md` and expands at the include site before the final user message is composed. Instruction partials are shared fragments for instruction facets, not standalone instruction facets resolved by name.
 
 Partial includes are intentionally narrow:
 
@@ -154,7 +155,7 @@ Partial includes are intentionally narrow:
 - Missing partials fail with an explicit error.
 - Cyclic include chains fail with an error that includes the chain.
 
-When local and global faceted roots are both present, instruction partials use the same first-match rule as facets: local `.faceted/facets/instruction-partials/` overrides global `~/.faceted/facets/instruction-partials/`. `composePromptPayload()` records instruction facet source paths in `copyFiles.instructions` and records included partial source paths in `copyFiles.instructionPartials` only when includes are used.
+When local and global faceted roots are both present, instruction partials use the same first-match rule as facets: local `.faceted/facets/partials/instructions/` overrides global `~/.faceted/facets/partials/instructions/`. `composePromptPayload()` records instruction facet source paths in `copyFiles.instructions` and records included partial source paths in `copyFiles.instructionPartials` only when includes are used.
 
 ## Compose Definitions
 

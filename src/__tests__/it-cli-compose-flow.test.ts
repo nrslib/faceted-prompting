@@ -80,7 +80,7 @@ function writeDefaultFacetFixture(homeDir: string, persona = 'You are a coding a
   mkdirSync(join(facetsRoot, 'knowledge'), { recursive: true });
   mkdirSync(join(facetsRoot, 'policies'), { recursive: true });
   mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
-  mkdirSync(join(facetsRoot, 'instruction-partials'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'partials/instructions'), { recursive: true });
   writeFileSync(join(facetsRoot, 'persona', 'coder.md'), persona, 'utf-8');
   writeFileSync(join(facetsRoot, 'knowledge', 'architecture.md'), 'Architecture reference.\n', 'utf-8');
   writeFileSync(join(facetsRoot, 'knowledge', 'frontend.md'), 'Frontend reference.\n', 'utf-8');
@@ -129,7 +129,7 @@ function writeTemplateCompositionFixture(homeDir: string): void {
   mkdirSync(join(facetsRoot, 'knowledge'), { recursive: true });
   mkdirSync(join(facetsRoot, 'policies'), { recursive: true });
   mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
-  mkdirSync(join(facetsRoot, 'instruction-partials'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'partials/instructions'), { recursive: true });
   mkdirSync(compositionsRoot, { recursive: true });
   mkdirSync(templateRoot, { recursive: true });
 
@@ -143,7 +143,7 @@ function writeTemplateCompositionFixture(homeDir: string): void {
     'utf-8',
   );
   writeFileSync(
-    join(facetsRoot, 'instruction-partials', 'review-common.md'),
+    join(facetsRoot, 'partials/instructions', 'review-common.md'),
     'Review template evidence before reporting.',
     'utf-8',
   );
@@ -263,7 +263,7 @@ describe('facet compose integration flow', () => {
 
     writeDefaultFacetFixture(homeDir, 'You are a release engineer.\n');
     const facetsRoot = join(homeDir, '.faceted', 'facets');
-    mkdirSync(join(facetsRoot, 'instruction-partials'), { recursive: true });
+    mkdirSync(join(facetsRoot, 'partials/instructions'), { recursive: true });
     writeFileSync(
       join(facetsRoot, 'instructions', 'keep-changes-small.md'),
       [
@@ -274,7 +274,7 @@ describe('facet compose integration flow', () => {
       'utf-8',
     );
     writeFileSync(
-      join(facetsRoot, 'instruction-partials', 'review-common.md'),
+      join(facetsRoot, 'partials/instructions', 'review-common.md'),
       'Review the original task requirements and execution evidence.',
       'utf-8',
     );

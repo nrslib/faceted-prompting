@@ -89,7 +89,8 @@ facet install skill
 │   ├── knowledge/
 │   ├── policies/
 │   ├── instructions/
-│   ├── instruction-partials/
+│   ├── partials/
+│   │   └── instructions/
 │   └── compositions/
 └── templates/
 
@@ -100,7 +101,8 @@ facet install skill
 │   ├── knowledge/        # Domain knowledge files
 │   ├── policies/         # Policy/rules files
 │   ├── instructions/     # Instruction files
-│   ├── instruction-partials/ # Reusable instruction-only Markdown partials
+│   ├── partials/
+│   │   └── instructions/  # Reusable instruction-only Markdown partials
 │   └── compositions/     # Compose definition YAML files
 └── templates/            # Skill templates
 ```
@@ -149,9 +151,9 @@ Review the change for mergeable quality.
 {{include:instructions/review-common}}
 ```
 
-The include above resolves to `facets/instruction-partials/review-common.md` and expands at the include site before prompt composition. Includes are supported only in instruction facets. The supported syntax is `{{include:instructions/<name>}}` for local/global partials and `{{include:instructions/@owner/repo/<name>}}` for repertoire partials; shortened forms such as `{{include:review-common}}` are invalid.
+The include above resolves to `facets/partials/instructions/review-common.md` and expands at the include site before prompt composition. Includes are supported only in instruction facets. The supported syntax is `{{include:instructions/<name>}}` for local/global partials and `{{include:instructions/@owner/repo/<name>}}` for repertoire partials under `repertoire/@owner/repo/facets/partials/instructions/<name>.md`; shortened forms such as `{{include:review-common}}` are invalid.
 
-Instruction partials use the same local-first layering as facets: `.faceted/facets/instruction-partials/` is checked before `~/.faceted/facets/instruction-partials/`. Missing includes and cyclic include chains fail with explicit errors. `composePromptPayload().copyFiles.instructions` includes instruction facet paths, and `composePromptPayload().copyFiles.instructionPartials` is present only when included partial paths exist.
+Instruction partials use the same local-first layering as facets: `.faceted/facets/partials/instructions/` is checked before `~/.faceted/facets/partials/instructions/`. Missing includes and cyclic include chains fail with explicit errors. `composePromptPayload().copyFiles.instructions` includes instruction facet paths, and `composePromptPayload().copyFiles.instructionPartials` is present only when included partial paths exist.
 
 ## Scope References
 
