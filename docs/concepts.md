@@ -15,7 +15,7 @@ As LLM prompts grow, they become monolithic blocks mixing identity, rules, conte
 
 ## The Solution: Facets
 
-Faceted Prompting separates prompts into four distinct facets, each with a defined role and placement rule.
+Faceted Prompting separates prompts into five distinct facets, each with a defined role and placement rule.
 
 ### Persona (WHO)
 
@@ -61,6 +61,16 @@ Implement a retry function with exponential backoff.
 It should accept a function, max retries, and initial delay.
 ```
 
+### Output Contracts (HOW TO ANSWER)
+
+Defines the expected response or report format. Placed in the **user message**.
+
+```markdown
+# output-contracts/review-report.md
+Return findings first, ordered by severity.
+Include a short test-results section.
+```
+
 ## Placement Rule
 
 The placement of each facet is deterministic and enforced by the library:
@@ -74,18 +84,20 @@ The placement of each facet is deterministic and enforced by the library:
 ├─────────────────────────────────┤
 │         User Message            │
 │                                 │
-│  Policy (HOW)                   │
-│  ─────────────────              │
 │  Knowledge (WHAT TO KNOW)       │
 │  ─────────────────              │
 │  Instruction (WHAT TO DO)       │
+│  ─────────────────              │
+│  Output contracts (HOW TO ANSWER)│
+│  ─────────────────              │
+│  Policy (HOW)                   │
 │                                 │
 └─────────────────────────────────┘
 ```
 
-Persona goes to the system prompt because it defines the agent's persistent identity. Policies, knowledge, and instructions go to the user message because they are task-specific context that may change between requests.
+Persona goes to the system prompt because it defines the agent's persistent identity. Policies, knowledge, instructions, and output contracts go to the user message because they are task-specific context that may change between requests.
 
-The order of sections within the user message is configurable via the `order` field in compose definitions.
+The default user-message order is knowledge, instructions, output contracts, then policies. The order of sections within the user message is configurable via the `order` field in compose definitions.
 
 ## Composition
 
@@ -103,6 +115,7 @@ const result = compose(
     ],
     knowledge: [{ body: 'The app uses Express.js with Passport auth.' }],
     instructions: [{ body: 'Review the authentication middleware.' }],
+    outputContracts: [{ body: 'Return a severity-sorted review report.' }],
   },
   { contextMaxChars: 8000 },
 );
@@ -127,9 +140,11 @@ facets/
 │   └── api-design.md
 ├── instructions/
 │   └── review.md
-└── partials/
-    └── instructions/
-        └── review-common.md
+├── partials/
+│   └── instructions/
+│       └── review-common.md
+└── output-contracts/
+    └── review-report.md
 ```
 
 The `FileDataEngine` resolves facets from this structure using the convention `{root}/{kind}/{key}.md`. The `CompositeDataEngine` layers multiple directories with first-match-wins resolution, enabling project-level facets to override global defaults.
@@ -172,13 +187,16 @@ policies:
   - security
 instructions:
   - review
+output-contracts:
+  - review-report
 order:
-  - policies
   - knowledge
   - instructions
+  - output-contracts
+  - policies
 ```
 
-The `instructions` field is a list of instruction facet names, paths to Markdown files, or inline Markdown text. Facet names are resolved against the facets directory; file paths (starting with `./`, `../`, `/`, `~`, or ending with `.md`) are resolved directly. Instruction entries that are not resolved as facet names or file paths are kept as inline prompt content.
+The `instructions` field can contain facet names, file paths, scope references, or inline Markdown text. The `output-contracts` field can contain facet names, file paths, or scope references. Facet names are resolved against the configured facets roots. Relative file paths are resolved from the compose definition directory, and real paths must stay inside that directory or the configured facets roots. Symlinks and paths outside those roots fail. Instruction entries that do not resolve are kept as inline prompt content.
 
 ## Scope References
 
@@ -190,7 +208,7 @@ knowledge:
   - "@nrslib/takt-fullstack/architecture"
 ```
 
-Scope references resolve to files in the repertoire directory:
+Scope references require repertoire roots and resolve to files in the repertoire directory:
 
 ```
 ~/.faceted/repertoire/@{owner}/{repo}/facets/{kind}/{name}.md

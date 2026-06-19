@@ -161,6 +161,7 @@ export async function runInstallSkillCommand(options: FacetCliOptions): Promise<
   const sections = buildSkillSections({
     definition,
     definitionDir,
+    facetedRoots,
     facetsRoots,
   });
 

@@ -4,15 +4,15 @@
 
 Structured prompt composition for LLMs — decompose prompts into reusable facets and compose them into LLM-ready messages.
 
-faceted-prompting separates prompt concerns into distinct facets (persona, policy, knowledge, instruction), each with a defined role and message placement. This keeps prompts modular, testable, and maintainable as they grow in complexity.
+faceted-prompting separates prompt concerns into distinct facets (persona, policy, knowledge, instruction, output contracts), each with a defined role and message placement. This keeps prompts modular, testable, and maintainable as they grow in complexity.
 
 ## Why Faceted Prompting
 
-**Separation of concerns** — Each facet has a single responsibility. Persona defines *who* the agent is, policies define *how* it should behave, knowledge provides *what it needs to know*, and instructions define *what to do*. Changes to one facet don't affect others.
+**Separation of concerns** — Each facet has a single responsibility. Persona defines *who* the agent is, policies define *how* it should behave, knowledge provides *what it needs to know*, instructions define *what to do*, and output contracts define *how to answer*. Changes to one facet don't affect others.
 
-**Deterministic placement** — Persona always goes to the system prompt. Policies, knowledge, and instructions always go to the user message. This placement rule is enforced by the library, not left to convention.
+**Deterministic placement** — Persona always goes to the system prompt. Policies, knowledge, instructions, and output contracts always go to the user message. This placement rule is enforced by the library, not left to convention.
 
-**Composable** — Facets are plain Markdown files. Mix and match personas, policies, and knowledge across different workflows. Share them as repertoire packages via `@owner/repo/facet-name` scope references.
+**Composable** — Facets are plain Markdown files. Mix and match personas, policies, knowledge, instructions, and output contracts across different workflows. Share them as repertoire packages via `@owner/repo/facet-name` scope references.
 
 **Framework-independent** — Zero dependencies on any specific AI framework. Use it with Claude, OpenAI, or any LLM provider.
 
@@ -24,6 +24,7 @@ faceted-prompting separates prompt concerns into distinct facets (persona, polic
 | **Policy** | User message | HOW — rules, standards, constraints |
 | **Knowledge** | User message | WHAT TO KNOW — domain context, architecture |
 | **Instruction** | User message | WHAT TO DO — the specific task |
+| **Output contracts** | User message | HOW TO ANSWER — output/report format |
 
 ## Install
 
@@ -52,12 +53,13 @@ const result = compose(
     policies: [{ body: 'Follow clean code principles. No any types.' }],
     knowledge: [{ body: 'The project uses Vitest for testing.' }],
     instructions: [{ body: 'Implement a retry function with exponential backoff.' }],
+    outputContracts: [{ body: 'Return a concise implementation report with test results.' }],
   },
   { contextMaxChars: 8000 },
 );
 
 // result.systemPrompt → "You are a senior TypeScript developer."
-// result.userMessage  → knowledge + instructions + policies (in order)
+// result.userMessage  → knowledge + instructions + output contracts + policies (in order)
 ```
 
 ### As a CLI
@@ -91,7 +93,8 @@ facet install skill
 │   ├── instructions/
 │   ├── partials/
 │   │   └── instructions/
-│   └── compositions/
+│   └── output-contracts/
+├── compositions/
 └── templates/
 
 ~/.faceted/                     # Global (fallback)
@@ -102,8 +105,9 @@ facet install skill
 │   ├── policies/         # Policy/rules files
 │   ├── instructions/     # Instruction files
 │   ├── partials/
-│   │   └── instructions/  # Reusable instruction-only Markdown partials
-│   └── compositions/     # Compose definition YAML files
+│   │   └── instructions/ # Reusable instruction-only Markdown partials
+│   └── output-contracts/ # Output/report format files
+├── compositions/         # Compose definition YAML files
 └── templates/            # Skill templates
 ```
 
@@ -133,15 +137,20 @@ policies:
   - quality
 instructions:
   - release-summary
+output-contracts:
+  - concise-report
 order:
   - knowledge
   - instructions
+  - output-contracts
   - policies
 ```
 
 - `name` and `persona` are required.
-- `order` controls user-message section order (default: `knowledge` -> `instructions` -> `policies`).
-- `instructions` is a list of instruction facet names, Markdown file paths, or inline Markdown text.
+- `order` controls user-message section order (default: `knowledge` -> `instructions` -> `output-contracts` -> `policies`).
+- `instructions` is a list of instruction facet names, Markdown file paths, scope references, or inline Markdown text.
+- `output-contracts` is a list of facet names, file paths, or scope references and is exposed as `outputContracts` in the TypeScript API.
+- Relative file paths are resolved from the compose definition directory. Real paths must stay inside that directory or the configured facets roots; symlinks and paths outside those roots fail.
 
 Instruction facet files can include shared Markdown partials:
 
@@ -165,7 +174,7 @@ knowledge:
   - "@nrslib/takt-fullstack/architecture"
 ```
 
-Scope references resolve to `~/.faceted/repertoire/@{owner}/{repo}/facets/{kind}/{name}.md`.
+Scope references require repertoire roots and resolve to `~/.faceted/repertoire/@{owner}/{repo}/facets/{kind}/{name}.md`.
 
 ## API
 
@@ -221,7 +230,8 @@ See the [API Reference](./docs/api-reference.md) for the full API surface.
 │   ├── knowledge/
 │   ├── policies/
 │   ├── instructions/
-│   └── compositions/
+│   └── output-contracts/
+├── compositions/
 └── templates/
 
 ~/.faceted/                     # Global (fallback, created by `facet init global`)
@@ -231,7 +241,8 @@ See the [API Reference](./docs/api-reference.md) for the full API surface.
 │   ├── knowledge/
 │   ├── policies/
 │   ├── instructions/
-│   └── compositions/
+│   └── output-contracts/
+├── compositions/
 ├── templates/                  # Skill install templates
 └── repertoire/                 # Installed repertoire packages
 ```

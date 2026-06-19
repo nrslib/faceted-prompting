@@ -18,7 +18,7 @@ This is a **TypeScript ESM library** (`"type": "module"`) that implements the Fa
 
 ### Core Concept: Facets
 
-Prompts are decomposed into four facet kinds (`FacetKind`), each with a defined role and placement:
+Prompts are decomposed into five facet kinds (`FacetKind`), each with a defined role and placement:
 
 | Facet | Placement | Purpose |
 |-------|-----------|---------|
@@ -26,12 +26,11 @@ Prompts are decomposed into four facet kinds (`FacetKind`), each with a defined 
 | Policy | User message | HOW — rules/standards |
 | Knowledge | User message | WHAT TO KNOW — domain context |
 | Instruction | User message | WHAT TO DO — the task |
-
-There is also an `output-contracts` kind defined in `FacetKind` but not yet used in `FacetSet`.
+| Output contracts | User message | HOW TO ANSWER — output/report format |
 
 ### Key Modules
 
-- **`compose.ts`** — Core composition: takes a `FacetSet` + `ComposeOptions` → `ComposedPrompt` (systemPrompt + userMessage). Policy and knowledge are truncated via `truncation.ts` when exceeding `contextMaxChars`.
+- **`compose.ts`** — Core composition: takes a `FacetSet` + `ComposeOptions` → `ComposedPrompt` (systemPrompt + userMessage). Default user-message order is knowledge → instructions → output-contracts → policies. Policy and knowledge are truncated via `truncation.ts` when exceeding `contextMaxChars`.
 - **`data-engine.ts`** — `DataEngine` interface for facet retrieval. `FileDataEngine` resolves `{root}/{kind}/{key}.md`. `CompositeDataEngine` chains engines with first-match-wins.
 - **`resolve.ts`** — Facet reference resolution: resolves names/paths/inline content from candidate directories and section maps. Supports `~`, `./`, `../`, `/` path prefixes and `.md` extension detection.
 - **`scope.ts`** — `@{owner}/{repo}/{facet-name}` scope reference parsing/validation for repertoire packages.

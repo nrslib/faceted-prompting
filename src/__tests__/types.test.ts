@@ -10,6 +10,8 @@ import type {
   FacetContent,
   FacetSet,
   ComposedPrompt,
+  ComposeDefinition,
+  ComposeOrderEntry,
   ComposeOptions,
 } from '../index.js';
 
@@ -52,9 +54,11 @@ describe('FacetSet interface', () => {
       policies: [{ body: 'Follow clean code.' }],
       knowledge: [{ body: 'Architecture docs.' }],
       instructions: [{ body: 'Implement the feature.' }],
+      outputContracts: [{ body: 'Write a structured report.' }],
     };
     expect(set.persona?.body).toBe('You are a coder.');
     expect(set.policies).toHaveLength(1);
+    expect(set.outputContracts?.[0]?.body).toBe('Write a structured report.');
   });
 
   it('should accept a partial facet set', () => {
@@ -81,7 +85,24 @@ describe('ComposeOptions interface', () => {
   it('should hold contextMaxChars', () => {
     const options: ComposeOptions = {
       contextMaxChars: 2000,
+      userMessageOrder: ['knowledge', 'instructions', 'output-contracts', 'policies'],
     };
     expect(options.contextMaxChars).toBe(2000);
+    expect(options.userMessageOrder).toEqual(['knowledge', 'instructions', 'output-contracts', 'policies']);
+  });
+});
+
+describe('ComposeDefinition public types', () => {
+  it('should expose compose definition and order entry from the package root', () => {
+    const order: ComposeOrderEntry[] = ['knowledge', 'instructions', 'output-contracts', 'policies'];
+    const definition: ComposeDefinition = {
+      name: 'coding',
+      persona: 'coder',
+      outputContracts: ['review-report'],
+      order,
+    };
+
+    expect(definition.outputContracts).toEqual(['review-report']);
+    expect(definition.order).toEqual(order);
   });
 });

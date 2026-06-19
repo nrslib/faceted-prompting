@@ -51,12 +51,16 @@ function createFacetedFixtureAtRoot(facetedRoot: string): {
   mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
   mkdirSync(join(facetsRoot, 'policies'), { recursive: true });
   mkdirSync(join(facetsRoot, 'knowledge'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'output-contracts'), { recursive: true });
   mkdirSync(compositionsRoot, { recursive: true });
 
   writeFileSync(join(facetedRoot, 'config.yaml'), 'version: 1\n', 'utf-8');
   writeFileSync(join(facetsRoot, 'persona', 'coder.md'), 'You are a coding agent.', 'utf-8');
   writeFileSync(join(facetsRoot, 'policies', 'coding.md'), 'Never hide errors.', 'utf-8');
   writeFileSync(join(facetsRoot, 'knowledge', 'architecture.md'), 'Architecture reference.', 'utf-8');
+  writeFileSync(join(facetsRoot, 'instructions', 'keep-changes-small.md'), 'Keep changes small and explicit.', 'utf-8');
+  writeFileSync(join(facetsRoot, 'output-contracts', 'review-report.md'), 'Return a structured review report.', 'utf-8');
   writeFileSync(
     join(compositionsRoot, 'coding.yaml'),
     [
@@ -67,6 +71,10 @@ function createFacetedFixtureAtRoot(facetedRoot: string): {
       '  - coding',
       'knowledge:',
       '  - architecture',
+      'instructions:',
+      '  - keep-changes-small',
+      'output-contracts:',
+      '  - review-report',
     ].join('\n'),
     'utf-8',
   );
@@ -186,10 +194,16 @@ describe('facet skill integration flow', () => {
 
     expect(result).toEqual({ kind: 'path', path: skillOutputPath });
     expect(existsSync(skillOutputPath)).toBe(true);
-    expect(readFileSync(skillOutputPath, 'utf-8')).toContain('You are a coding agent.');
+    const skillBody = readFileSync(skillOutputPath, 'utf-8');
+    expect(skillBody).toContain('You are a coding agent.');
+    expect(skillBody).toContain('## Output Contracts');
+    expect(skillBody).toContain('Return a structured review report.');
+    expect(skillBody.indexOf('## Knowledge')).toBeLessThan(skillBody.indexOf('## Instructions'));
+    expect(skillBody.indexOf('## Instructions')).toBeLessThan(skillBody.indexOf('## Output Contracts'));
+    expect(skillBody.indexOf('## Output Contracts')).toBeLessThan(skillBody.indexOf('## Policies'));
   });
 
-  it('should keep generated skill sections in legacy order when compose order differs', async () => {
+  it('should keep generated skill sections in compose order when compose order differs', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
     tempDirs.push(workspaceDir, homeDir);
@@ -230,9 +244,9 @@ describe('facet skill integration flow', () => {
     expect(result).toEqual({ kind: 'path', path: skillOutputPath });
     expectTextOrder(readFileSync(skillOutputPath, 'utf-8'), [
       '## Persona',
-      '## Policies',
       '## Knowledge',
       '## Instructions',
+      '## Policies',
     ]);
   });
 
@@ -420,6 +434,76 @@ describe('facet skill integration flow', () => {
     expect(
       existsSync(join(homeDir, '.claude', 'skills', 'templated', 'facets', 'instructions', 'review-common.md')),
     ).toBe(false);
+  });
+
+  it('should not replace facet tokens inside copied scoped instruction partials', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    const facetedRoot = join(homeDir, '.faceted');
+    const facetsRoot = join(facetedRoot, 'facets');
+    const compositionsRoot = join(facetedRoot, 'compositions');
+    const templateRoot = join(facetedRoot, 'templates', 'starter-kit');
+    const scopedPartialPath = join(
+      facetedRoot,
+      'repertoire',
+      '@acme',
+      'review-pack',
+      'facets',
+      'partials/instructions',
+      'review-common.md',
+    );
+
+    mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
+    mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
+    mkdirSync(compositionsRoot, { recursive: true });
+    mkdirSync(templateRoot, { recursive: true });
+    mkdirSync(dirname(scopedPartialPath), { recursive: true });
+    writeFileSync(join(facetedRoot, 'config.yaml'), 'version: 1\n', 'utf-8');
+    writeFileSync(join(facetsRoot, 'persona', 'coder.md'), 'You are a template coding agent.', 'utf-8');
+    writeFileSync(
+      join(facetsRoot, 'instructions', 'keep-deterministic.md'),
+      'Keep template output deterministic.\n{{include:instructions/@acme/review-pack/review-common}}',
+      'utf-8',
+    );
+    writeFileSync(scopedPartialPath, 'Keep {{facet:persona}} literal in copied partial.', 'utf-8');
+    writeFileSync(
+      join(compositionsRoot, 'templated.yaml'),
+      [
+        'name: templated',
+        'persona: coder',
+        'instructions:',
+        '  - keep-deterministic',
+        'template: starter-kit',
+      ].join('\n'),
+      'utf-8',
+    );
+    writeFileSync(join(templateRoot, 'SKILL.md'), '{{facet:instructions}}\n', 'utf-8');
+
+    const skillOutputPath = join(homeDir, '.claude', 'skills', 'templated', 'SKILL.md');
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli(['install', 'skill'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['templated (global)', 'Claude Code']),
+      input: async (prompt, defaultValue) =>
+        prompt.toLowerCase().includes('output') ? skillOutputPath : defaultValue,
+    });
+
+    const copiedScopedPartialPath = join(
+      dirname(skillOutputPath),
+      'repertoire',
+      '@acme',
+      'review-pack',
+      'facets',
+      'partials/instructions',
+      'review-common.md',
+    );
+    expect(result).toEqual({ kind: 'path', path: skillOutputPath });
+    expect(readFileSync(copiedScopedPartialPath, 'utf-8')).toBe(
+      'Keep {{facet:persona}} literal in copied partial.',
+    );
   });
 
   it('should prefer local composition and facets while falling back to global facets for missing refs', async () => {

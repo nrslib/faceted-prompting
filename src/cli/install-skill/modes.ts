@@ -80,6 +80,7 @@ export async function runSkillDeployInstall(params: {
   const payload = composePromptPayload({
     definition: params.definition,
     definitionDir: params.definitionDir,
+    facetedRoots: params.facetedRoots,
     facetsRoots: params.facetsRoots,
     composeOptions: { contextMaxChars: 8000 },
   });
@@ -112,7 +113,7 @@ export async function runSkillDeployInstall(params: {
       rootDir: targetDir,
       maxDepth: Number.MAX_SAFE_INTEGER,
       tokenValues: buildInlineFacetTokenValues(params.sections),
-      excludeDirs: ['facets'],
+      excludeDirs: ['facets', 'repertoire'],
     });
 
     ensureTemplateBackedSkillFrontmatter({

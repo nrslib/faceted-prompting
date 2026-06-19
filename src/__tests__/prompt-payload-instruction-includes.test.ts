@@ -294,7 +294,7 @@ describe('composePromptPayload instruction partial includes', () => {
           persona: 'coder',
           policies: [policyPath],
         },
-        definitionDir: rootDir,
+        definitionDir: join(rootDir, 'compositions'),
         facetsRoot,
         composeOptions: {
           contextMaxChars: 8000,

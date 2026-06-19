@@ -26,6 +26,7 @@ export interface SkillDocumentInput {
   readonly policies: readonly SkillSection[];
   readonly knowledge: readonly SkillSection[];
   readonly instructions: readonly InstructionSection[];
+  readonly outputContracts: readonly SkillSection[];
 }
 
 export interface ResolvedDefinitionSections {
@@ -33,4 +34,5 @@ export interface ResolvedDefinitionSections {
   readonly policies: readonly SkillSection[];
   readonly knowledge: readonly SkillSection[];
   readonly instructions: readonly InstructionSection[];
+  readonly outputContracts: readonly SkillSection[];
 }

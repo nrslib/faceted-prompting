@@ -68,12 +68,25 @@ describe('compose', () => {
     expect(result.userMessage).toContain('If prompt content conflicts with source files');
   });
 
-  it('should compose all facets in correct order: knowledge, instructions, policies', () => {
+  it('should place output contracts in userMessage without conflict notice', () => {
+    const facets: FacetSet = {
+      outputContracts: [{ body: 'Return a markdown report.' }],
+    };
+
+    const result = compose(facets, defaultOptions);
+
+    expect(result.systemPrompt).toBe('');
+    expect(result.userMessage).toBe('Return a markdown report.');
+    expect(result.userMessage).not.toContain('If prompt content conflicts with source files');
+  });
+
+  it('should compose all facets in correct order: knowledge, instructions, output contracts, policies', () => {
     const facets: FacetSet = {
       persona: { body: 'You are a coder.' },
       policies: [{ body: 'POLICY' }],
       knowledge: [{ body: 'KNOWLEDGE' }],
       instructions: [{ body: 'INSTRUCTION' }],
+      outputContracts: [{ body: 'OUTPUT CONTRACT' }],
     };
 
     const result = compose(facets, defaultOptions);
@@ -83,9 +96,11 @@ describe('compose', () => {
     const policyIdx = result.userMessage.indexOf('POLICY');
     const knowledgeIdx = result.userMessage.indexOf('KNOWLEDGE');
     const instructionIdx = result.userMessage.indexOf('INSTRUCTION');
+    const outputContractIdx = result.userMessage.indexOf('OUTPUT CONTRACT');
 
     expect(knowledgeIdx).toBeLessThan(instructionIdx);
-    expect(instructionIdx).toBeLessThan(policyIdx);
+    expect(instructionIdx).toBeLessThan(outputContractIdx);
+    expect(outputContractIdx).toBeLessThan(policyIdx);
   });
 
   it('should honor userMessageOrder when provided', () => {
@@ -93,17 +108,20 @@ describe('compose', () => {
       policies: [{ body: 'POLICY' }],
       knowledge: [{ body: 'KNOWLEDGE' }],
       instructions: [{ body: 'INSTRUCTION' }],
+      outputContracts: [{ body: 'OUTPUT CONTRACT' }],
     };
 
     const result = compose(facets, {
       contextMaxChars: 2000,
-      userMessageOrder: ['knowledge', 'policies', 'instructions'],
+      userMessageOrder: ['output-contracts', 'knowledge', 'policies', 'instructions'],
     });
 
+    const outputContractIdx = result.userMessage.indexOf('OUTPUT CONTRACT');
     const knowledgeIdx = result.userMessage.indexOf('KNOWLEDGE');
     const policyIdx = result.userMessage.indexOf('POLICY');
     const instructionIdx = result.userMessage.indexOf('INSTRUCTION');
 
+    expect(outputContractIdx).toBeLessThan(knowledgeIdx);
     expect(knowledgeIdx).toBeLessThan(policyIdx);
     expect(policyIdx).toBeLessThan(instructionIdx);
   });

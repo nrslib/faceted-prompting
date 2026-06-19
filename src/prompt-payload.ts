@@ -1,7 +1,7 @@
 import { compose } from './compose.js';
 import type { ComposeDefinition, ComposedPromptPayload, ComposeOptions, CopyFiles } from './types.js';
-import { buildFacetSet, resolveDefinitionSections } from './cli/skill-renderer.js';
-import type { InstructionSection } from './cli/skill-types.js';
+import { buildFacetSetFromResolvedSections, resolveDefinitionSections } from './cli/skill-renderer.js';
+import type { InstructionSection, ResolvedDefinitionSections } from './cli/skill-types.js';
 
 function instructionFacetPath(instruction: InstructionSection): string | undefined {
   if ('path' in instruction) {
@@ -23,13 +23,7 @@ function dedupePaths(paths: readonly string[]): readonly string[] {
   []);
 }
 
-function buildCopyFiles(params: {
-  definition: ComposeDefinition;
-  definitionDir: string;
-  facetsRoot?: string;
-  facetsRoots?: readonly string[];
-}): CopyFiles {
-  const resolved = resolveDefinitionSections(params);
+function buildCopyFiles(resolved: ResolvedDefinitionSections): CopyFiles {
   const instructionPartials = dedupePaths(
     resolved.instructions.flatMap(instruction => instructionPartialSourcePaths(instruction)),
   );
@@ -43,6 +37,7 @@ function buildCopyFiles(params: {
         .map(instruction => instructionFacetPath(instruction))
         .filter(path => path !== undefined),
     ),
+    outputContracts: resolved.outputContracts.map(section => section.path),
     ...(instructionPartials.length > 0 ? { instructionPartials } : {}),
   };
 }
@@ -52,9 +47,11 @@ export function composePromptPayload(params: {
   definitionDir: string;
   facetsRoot?: string;
   facetsRoots?: readonly string[];
+  facetedRoots?: readonly string[];
   composeOptions: ComposeOptions;
 }): ComposedPromptPayload {
-  const facetSet = buildFacetSet(params);
+  const resolved = resolveDefinitionSections(params);
+  const facetSet = buildFacetSetFromResolvedSections(resolved);
   const composed = compose(facetSet, {
     ...params.composeOptions,
     userMessageOrder: params.definition.order,
@@ -63,6 +60,6 @@ export function composePromptPayload(params: {
   return {
     systemPrompt: composed.systemPrompt,
     userPrompt: composed.userMessage,
-    copyFiles: buildCopyFiles(params),
+    copyFiles: buildCopyFiles(resolved),
   };
 }

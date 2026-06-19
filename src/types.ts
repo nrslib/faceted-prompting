@@ -2,7 +2,7 @@
  * Core type definitions for Faceted Prompting.
  *
  * Defines the vocabulary of facets (persona, policy, knowledge, instruction,
- * output-contract) and the structures used by compose() and DataEngine.
+ * output-contracts) and the structures used by compose() and DataEngine.
  *
  * This module has ZERO dependencies on TAKT internals.
  */
@@ -33,13 +33,14 @@ export interface FacetSet {
   readonly policies?: readonly FacetContent[];
   readonly knowledge?: readonly FacetContent[];
   readonly instructions?: readonly FacetContent[];
+  readonly outputContracts?: readonly FacetContent[];
 }
 
 /**
  * The output of compose(): facet content assigned to LLM message slots.
  *
  * persona → systemPrompt
- * policy + knowledge + instruction → userMessage
+ * knowledge + instructions + output-contracts + policies → userMessage
  */
 export interface ComposedPrompt {
   readonly systemPrompt: string;
@@ -51,6 +52,7 @@ export interface CopyFiles {
   readonly knowledge: readonly string[];
   readonly policies: readonly string[];
   readonly instructions: readonly string[];
+  readonly outputContracts: readonly string[];
   readonly instructionPartials?: readonly string[];
 }
 
@@ -61,7 +63,14 @@ export interface ComposedPromptPayload {
 }
 
 /** User-message sections that can be ordered in compose definitions. */
-export type ComposeOrderEntry = 'policies' | 'knowledge' | 'instructions';
+export type ComposeOrderEntry = 'policies' | 'knowledge' | 'instructions' | 'output-contracts';
+
+export const DEFAULT_USER_MESSAGE_ORDER: readonly ComposeOrderEntry[] = [
+  'knowledge',
+  'instructions',
+  'output-contracts',
+  'policies',
+];
 
 /** CLI compose definition loaded from YAML. */
 export interface ComposeDefinition {
@@ -72,6 +81,7 @@ export interface ComposeDefinition {
   readonly knowledge?: readonly string[];
   readonly policies?: readonly string[];
   readonly instructions?: readonly string[];
+  readonly outputContracts?: readonly string[];
   readonly order?: readonly ComposeOrderEntry[];
 }
 
@@ -79,6 +89,6 @@ export interface ComposeDefinition {
 export interface ComposeOptions {
   /** Maximum character length for knowledge/policy content before truncation. */
   readonly contextMaxChars: number;
-  /** Optional user-message section order for policies/knowledge/instruction. */
+  /** Optional user-message section order for knowledge/instructions/output-contracts/policies. */
   readonly userMessageOrder?: readonly ComposeOrderEntry[];
 }
