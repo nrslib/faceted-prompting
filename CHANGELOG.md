@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-06-19
+
+### Added
+- 第5のファセットとして output contracts（出力契約）を追加。回答・レポートの出力フォーマットを `output-contracts/` ファセットとして分離して管理でき、compose 定義 YAML の `output-contracts:` キー（TypeScript API では `outputContracts`）で指定できる。テンプレートトークン `{{facet:outputContracts}}` にも対応 (#34)
+- インストラクションファセットの部分テンプレート include を追加。`{{include:instructions/<name>}}` で `facets/partials/instructions/<name>.md` を展開でき、共通の指示文を複数のインストラクション間で再利用できる。リポジトリスコープ参照 `{{include:instructions/@owner/repo/<name>}}` にも対応。ローカル優先で解決し、include の欠落・循環参照は明示的なエラーで停止する (#35)
+- `ComposeDefinition`, `ComposeOrderEntry` 型を公開 API としてエクスポート (#34)
+
+### Changed
+- デフォルトのユーザーメッセージ順序を `knowledge → instructions → output-contracts → policies` に変更。出力契約が出力フォーマットの指示としてポリシーの直前に配置されるようになった (#34)
+
+### Internal
+- auto-tag ワークフローに `workflow_dispatch` トリガーを追加し、手動での publish を可能に
+- `.takt/config.yaml` を更新
+
 ## [0.4.0] - 2026-04-01
 
 ### Added
