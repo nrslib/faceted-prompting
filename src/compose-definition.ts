@@ -14,7 +14,7 @@ const ALLOWED_COMPOSE_KEYS = new Set([
   'order',
 ]);
 
-const ORDER_VALUES = new Set(['knowledge', 'policies', 'instructions', 'output-contracts']);
+const ORDER_VALUES = new Set(['persona', 'knowledge', 'policies', 'instructions', 'output-contracts']);
 
 function normalizeOrder(rawOrder: string[] | undefined): ComposeOrderEntry[] | undefined {
   if (!rawOrder) return undefined;
@@ -24,6 +24,7 @@ function normalizeOrder(rawOrder: string[] | undefined): ComposeOrderEntry[] | u
     if (!ORDER_VALUES.has(entry)) {
       throw new Error(`Invalid compose order entry: ${entry}`);
     }
+    if (entry === 'persona') continue;
     const typedEntry = entry as ComposeOrderEntry;
     if (seen.has(typedEntry)) continue;
     seen.add(typedEntry);

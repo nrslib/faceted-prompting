@@ -94,7 +94,7 @@ describe('loadComposeDefinition', () => {
     expect(loaded.order).toEqual(['policies', 'knowledge', 'instructions']);
   });
 
-  it('should reject persona in order entries', async () => {
+  it('should ignore persona in order entries and preserve the remaining order', async () => {
     const root = mkdtempSync(join(tmpdir(), 'facet-compose-def-'));
     tempDirs.push(root);
 
@@ -117,7 +117,8 @@ describe('loadComposeDefinition', () => {
     );
 
     const { loadComposeDefinition } = await loadComposeDefinitionModule();
-    await expect(loadComposeDefinition(definitionPath)).rejects.toThrow('Invalid compose order entry: persona');
+    const loaded = await loadComposeDefinition(definitionPath);
+    expect(loaded.order).toEqual(['output-contracts', 'policies']);
   });
 
   it('should parse instructions as list', async () => {

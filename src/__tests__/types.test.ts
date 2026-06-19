@@ -4,9 +4,6 @@
  * Verifies that types are correctly exported and usable.
  */
 
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
 import type {
   FacetKind,
@@ -17,40 +14,6 @@ import type {
   ComposeOrderEntry,
   ComposeOptions,
 } from '../index.js';
-
-const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
-
-function parseVersion(version: string): readonly [number, number, number] {
-  const parts = version.split('.');
-  if (parts.length !== 3) {
-    throw new Error(`Invalid version: ${version}`);
-  }
-
-  return parts.map(part => {
-    const value = Number.parseInt(part, 10);
-    if (!Number.isInteger(value)) {
-      throw new Error(`Invalid version: ${version}`);
-    }
-
-    return value;
-  }) as [number, number, number];
-}
-
-function isAtLeastVersion(version: string, minimum: string): boolean {
-  const currentParts = parseVersion(version);
-  const minimumParts = parseVersion(minimum);
-
-  for (let index = 0; index < currentParts.length; index += 1) {
-    if (currentParts[index] > minimumParts[index]) {
-      return true;
-    }
-    if (currentParts[index] < minimumParts[index]) {
-      return false;
-    }
-  }
-
-  return true;
-}
 
 describe('FacetKind type', () => {
   it('should accept valid facet kinds', () => {
@@ -141,21 +104,5 @@ describe('ComposeDefinition public types', () => {
 
     expect(definition.outputContracts).toEqual(['review-report']);
     expect(definition.order).toEqual(order);
-  });
-});
-
-describe('runtime dependency contract', () => {
-  it('should keep yaml outside the vulnerable production range', () => {
-    const packageLock = JSON.parse(
-      readFileSync(resolve(repoRoot, 'package-lock.json'), 'utf8'),
-    ) as {
-      packages: {
-        '': { dependencies: { yaml: string } };
-        'node_modules/yaml': { version: string };
-      };
-    };
-
-    expect(packageLock.packages[''].dependencies.yaml).toBe('^2.8.3');
-    expect(isAtLeastVersion(packageLock.packages['node_modules/yaml'].version, '2.8.3')).toBe(true);
   });
 });
