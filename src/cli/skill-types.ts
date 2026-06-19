@@ -13,7 +13,11 @@ export interface SkillSection {
   readonly path: string;
 }
 
-export type InstructionSection = SkillSection | { readonly ref: 'literal'; readonly body: string };
+export interface FileInstructionSection extends SkillSection {
+  readonly sourcePaths: readonly string[];
+}
+
+export type InstructionSection = FileInstructionSection | { readonly ref: 'literal'; readonly body: string };
 
 export interface SkillDocumentInput {
   readonly definition: ComposeDefinition;

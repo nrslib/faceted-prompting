@@ -80,6 +80,7 @@ function writeDefaultFacetFixture(homeDir: string, persona = 'You are a coding a
   mkdirSync(join(facetsRoot, 'knowledge'), { recursive: true });
   mkdirSync(join(facetsRoot, 'policies'), { recursive: true });
   mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'partials/instructions'), { recursive: true });
   writeFileSync(join(facetsRoot, 'persona', 'coder.md'), persona, 'utf-8');
   writeFileSync(join(facetsRoot, 'knowledge', 'architecture.md'), 'Architecture reference.\n', 'utf-8');
   writeFileSync(join(facetsRoot, 'knowledge', 'frontend.md'), 'Frontend reference.\n', 'utf-8');
@@ -128,6 +129,7 @@ function writeTemplateCompositionFixture(homeDir: string): void {
   mkdirSync(join(facetsRoot, 'knowledge'), { recursive: true });
   mkdirSync(join(facetsRoot, 'policies'), { recursive: true });
   mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'partials/instructions'), { recursive: true });
   mkdirSync(compositionsRoot, { recursive: true });
   mkdirSync(templateRoot, { recursive: true });
 
@@ -135,8 +137,16 @@ function writeTemplateCompositionFixture(homeDir: string): void {
   writeFileSync(join(facetsRoot, 'persona', 'coder.md'), 'You are a template coding agent.', 'utf-8');
   writeFileSync(join(facetsRoot, 'knowledge', 'architecture.md'), 'Template architecture knowledge.', 'utf-8');
   writeFileSync(join(facetsRoot, 'policies', 'coding.md'), 'Template coding policy.', 'utf-8');
-  writeFileSync(join(facetsRoot, 'instructions', 'keep-deterministic.md'), 'Keep template output deterministic.', 'utf-8');
-
+  writeFileSync(
+    join(facetsRoot, 'instructions', 'keep-deterministic.md'),
+    'Keep template output deterministic.\n{{include:instructions/review-common}}',
+    'utf-8',
+  );
+  writeFileSync(
+    join(facetsRoot, 'partials/instructions', 'review-common.md'),
+    'Review template evidence before reporting.',
+    'utf-8',
+  );
   writeFileSync(
     join(compositionsRoot, 'templated.yaml'),
     [
@@ -244,6 +254,60 @@ describe('facet compose integration flow', () => {
     }
     expect(result.path).toBe(join(outputDir, 'coding.md'));
     expect(readFileSync(result.path, 'utf-8')).toContain('You are a release engineer.');
+  });
+
+  it('should compose instruction partial includes in standard combined output', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeDefaultFacetFixture(homeDir, 'You are a release engineer.\n');
+    const facetsRoot = join(homeDir, '.faceted', 'facets');
+    mkdirSync(join(facetsRoot, 'partials/instructions'), { recursive: true });
+    writeFileSync(
+      join(facetsRoot, 'instructions', 'keep-changes-small.md'),
+      [
+        'Review whether the current change is mergeable quality.',
+        '{{include:instructions/review-common}}',
+        'Keep changes small and explicit.',
+      ].join('\n'),
+      'utf-8',
+    );
+    writeFileSync(
+      join(facetsRoot, 'partials/instructions', 'review-common.md'),
+      'Review the original task requirements and execution evidence.',
+      'utf-8',
+    );
+
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli([
+      'compose',
+      '--composition',
+      'coding',
+      '--combined',
+    ], {
+      cwd: workspaceDir,
+      homeDir,
+      select: unexpectedSelect,
+      input: unexpectedInput,
+    });
+
+    expect(result.kind).toBe('path');
+    if (result.kind !== 'path') {
+      throw new Error('Expected path result for combined compose command');
+    }
+    const generated = readFileSync(result.path, 'utf-8');
+    const instructionStartIndex = generated.indexOf('Review whether the current change is mergeable quality.');
+    const includedIndex = generated.indexOf('Review the original task requirements and execution evidence.');
+    const instructionEndIndex = generated.indexOf('Keep changes small and explicit.');
+
+    expect(instructionStartIndex).toBeGreaterThanOrEqual(0);
+    expect(instructionStartIndex).toBeLessThan(includedIndex);
+    expect(includedIndex).toBeLessThan(instructionEndIndex);
+    expect(generated).toContain('Review whether the current change is mergeable quality.');
+    expect(generated).toContain('Review the original task requirements and execution evidence.');
+    expect(generated).toContain('Keep changes small and explicit.');
+    expect(generated).not.toContain('{{include:instructions/review-common}}');
   });
 
   it('should compose standard output non-interactively into split files in the default cwd', async () => {
@@ -849,6 +913,8 @@ describe('facet compose integration flow', () => {
     expect(readFileSync(renderedPath, 'utf-8')).toContain('Template architecture knowledge.');
     expect(readFileSync(renderedPath, 'utf-8')).toContain('Template coding policy.');
     expect(readFileSync(renderedPath, 'utf-8')).toContain('Keep template output deterministic.');
+    expect(readFileSync(renderedPath, 'utf-8')).toContain('Review template evidence before reporting.');
+    expect(readFileSync(renderedPath, 'utf-8')).not.toContain('{{include:instructions/review-common}}');
     expect(existsSync(join(outputDir, 'README.md'))).toBe(true);
     expect(inputPrompts.some(prompt => prompt.includes('[y/N]'))).toBe(false);
   });

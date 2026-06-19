@@ -140,11 +140,37 @@ facets/
 │   └── api-design.md
 ├── instructions/
 │   └── review.md
+├── partials/
+│   └── instructions/
+│       └── review-common.md
 └── output-contracts/
     └── review-report.md
 ```
 
 The `FileDataEngine` resolves facets from this structure using the convention `{root}/{kind}/{key}.md`. The `CompositeDataEngine` layers multiple directories with first-match-wins resolution, enabling project-level facets to override global defaults.
+
+## Instruction Partials
+
+Instruction facets can include reusable Markdown partials for shared task procedure text:
+
+```markdown
+# instructions/review.md
+Review the change for mergeable quality.
+
+{{include:instructions/review-common}}
+```
+
+The include resolves to `facets/partials/instructions/review-common.md` and expands at the include site before the final user message is composed. Instruction partials are shared fragments for instruction facets, not standalone instruction facets resolved by name.
+
+Partial includes are intentionally narrow:
+
+- Only instruction facets expand include tokens.
+- The supported syntax is `{{include:instructions/<name>}}` or `{{include:instructions/@owner/repo/<name>}}`.
+- Shortened syntax such as `{{include:<name>}}` is invalid.
+- Missing partials fail with an explicit error.
+- Cyclic include chains fail with an error that includes the chain.
+
+When local and global faceted roots are both present, instruction partials use the same first-match rule as facets: local `.faceted/facets/partials/instructions/` overrides global `~/.faceted/facets/partials/instructions/`. `composePromptPayload()` records instruction facet source paths in `copyFiles.instructions` and records included partial source paths in `copyFiles.instructionPartials` only when includes are used.
 
 ## Compose Definitions
 
@@ -160,7 +186,7 @@ policies:
   - coding
   - security
 instructions:
-  - review-changes
+  - review
 output-contracts:
   - review-report
 order:
@@ -170,7 +196,7 @@ order:
   - policies
 ```
 
-The `instructions` field can contain facet names, file paths, or scope references. The `output-contracts` field can contain facet names, file paths, or scope references. Facet names are resolved against the configured facets roots. Relative file paths are resolved from the compose definition directory, and real paths must stay inside that directory or the configured facets roots. Symlinks and paths outside those roots fail.
+The `instructions` field can contain facet names, file paths, scope references, or inline Markdown text. The `output-contracts` field can contain facet names, file paths, or scope references. Facet names are resolved against the configured facets roots. Relative file paths are resolved from the compose definition directory, and real paths must stay inside that directory or the configured facets roots. Symlinks and paths outside those roots fail. Instruction entries that do not resolve are kept as inline prompt content.
 
 ## Scope References
 

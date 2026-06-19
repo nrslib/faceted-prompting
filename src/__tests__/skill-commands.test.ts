@@ -57,6 +57,7 @@ describe('buildSectionsWithCopiedPaths', () => {
         policies: ['/target/facets/policies/coding.md'],
         instructions: ['/target/facets/instructions/plain-skill.md'],
         outputContracts: ['/target/facets/output-contracts/test-report.md'],
+        instructionPartials: [],
       }),
     ).toThrow('Copied knowledge facet count mismatch');
   });
@@ -71,6 +72,7 @@ describe('buildSectionsWithCopiedPaths', () => {
         policies: [],
         instructions: ['/target/facets/instructions/plain-skill.md'],
         outputContracts: ['/target/facets/output-contracts/test-report.md'],
+        instructionPartials: [],
       }),
     ).toThrow('Copied policy facet count mismatch');
   });
@@ -85,6 +87,7 @@ describe('buildSectionsWithCopiedPaths', () => {
         policies: ['/target/facets/policies/coding.md'],
         instructions: ['/target/facets/instructions/plain-skill.md'],
         outputContracts: [],
+        instructionPartials: [],
       }),
     ).toThrow('Copied output-contracts facet count mismatch');
   });
@@ -98,6 +101,7 @@ describe('buildSectionsWithCopiedPaths', () => {
       policies: ['/target/facets/policies/coding.md'],
       instructions: ['/target/facets/instructions/plain-skill.md'],
       outputContracts: ['/target/facets/output-contracts/test-report.md'],
+      instructionPartials: [],
     });
 
     expect(copied.outputContracts).toEqual([

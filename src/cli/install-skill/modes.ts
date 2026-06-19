@@ -113,7 +113,7 @@ export async function runSkillDeployInstall(params: {
       rootDir: targetDir,
       maxDepth: Number.MAX_SAFE_INTEGER,
       tokenValues: buildInlineFacetTokenValues(params.sections),
-      excludeDirs: ['facets'],
+      excludeDirs: ['facets', 'repertoire'],
     });
 
     ensureTemplateBackedSkillFrontmatter({

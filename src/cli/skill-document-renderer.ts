@@ -1,6 +1,11 @@
 import { DEFAULT_USER_MESSAGE_ORDER } from '../types.js';
 import type { ComposeDefinition, ComposeOrderEntry } from '../types.js';
-import type { InstructionSection, SkillDocumentInput, SkillSection } from './skill-types.js';
+import type {
+  FileInstructionSection,
+  InstructionSection,
+  SkillDocumentInput,
+  SkillSection,
+} from './skill-types.js';
 
 function makeSkillHeader(definition: ComposeDefinition): string {
   return [
@@ -19,7 +24,7 @@ export function hasYamlFrontmatter(content: string): boolean {
   return /^---\n[\s\S]*?\n---(?:\n|$)/u.test(content);
 }
 
-function hasInstructionPath(instruction: InstructionSection): instruction is SkillSection {
+function hasInstructionPath(instruction: InstructionSection): instruction is FileInstructionSection {
   return instruction.ref !== 'literal';
 }
 

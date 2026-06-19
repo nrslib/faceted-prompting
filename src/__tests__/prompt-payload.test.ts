@@ -103,9 +103,14 @@ describe('composePromptPayload', () => {
     }
   });
 
-  it('should return prompts and copy-files from a compose definition', () => {
+  function createRootDir(): string {
     const rootDir = mkdtempSync(join(tmpdir(), 'facet-payload-'));
     tempDirs.push(rootDir);
+    return rootDir;
+  }
+
+  it('should return prompts and copy-files from a compose definition without changing copyFiles shape', () => {
+    const rootDir = createRootDir();
 
     const facetsRoot = join(rootDir, 'facets');
     mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
@@ -157,31 +162,46 @@ describe('composePromptPayload', () => {
     });
   });
 
-  it('should resolve instruction name from facets/instructions directory', () => {
-    const rootDir = mkdtempSync(join(tmpdir(), 'facet-payload-'));
-    tempDirs.push(rootDir);
+  it('should resolve compose payload facets from the first matching facets root', () => {
+    const rootDir = createRootDir();
+    const localFacetsRoot = join(rootDir, 'local', 'facets');
+    const globalFacetsRoot = join(rootDir, 'global', 'facets');
 
-    const facetsRoot = join(rootDir, 'facets');
-    mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
-    mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
-    writeFileSync(join(facetsRoot, 'persona', 'coder.md'), 'You are a coding agent.', 'utf-8');
-    writeFileSync(join(facetsRoot, 'instructions', 'do-the-work.md'), 'Do the work.', 'utf-8');
+    mkdirSync(join(localFacetsRoot, 'instructions'), { recursive: true });
+    mkdirSync(join(globalFacetsRoot, 'persona'), { recursive: true });
+    mkdirSync(join(globalFacetsRoot, 'instructions'), { recursive: true });
+
+    const personaPath = join(globalFacetsRoot, 'persona', 'coder.md');
+    const localInstructionPath = join(localFacetsRoot, 'instructions', 'task.md');
+    const globalInstructionPath = join(globalFacetsRoot, 'instructions', 'task.md');
+
+    writeFileSync(personaPath, 'You are a global coding agent.', 'utf-8');
+    writeFileSync(localInstructionPath, 'Local instruction.', 'utf-8');
+    writeFileSync(globalInstructionPath, 'Global instruction.', 'utf-8');
 
     const payload = composePromptPayload({
       definition: {
         name: 'coding',
         persona: 'coder',
-        instructions: ['do-the-work'],
+        instructions: ['task'],
       },
       definitionDir: rootDir,
-      facetsRoot,
+      facetsRoots: [localFacetsRoot, globalFacetsRoot],
       composeOptions: {
         contextMaxChars: 8000,
       },
     });
 
-    expect(payload.copyFiles.instructions).toHaveLength(1);
-    expect(payload.userPrompt).toContain('Do the work.');
+    expect(payload.systemPrompt).toContain('You are a global coding agent.');
+    expect(payload.userPrompt).toContain('Local instruction.');
+    expect(payload.userPrompt).not.toContain('Global instruction.');
+    expect(payload.copyFiles).toEqual({
+      persona: [realpathSync(personaPath)],
+      knowledge: [],
+      policies: [],
+      instructions: [realpathSync(localInstructionPath)],
+      outputContracts: [],
+    });
   });
 
   for (const facetCase of facetResolverCases) {

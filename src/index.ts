@@ -13,8 +13,8 @@ export type {
   ComposedPrompt,
   ComposedPromptPayload,
   ComposeDefinition,
-  ComposeOrderEntry,
   ComposeOptions,
+  ComposeOrderEntry,
   CopyFiles,
 } from './types.js';
 

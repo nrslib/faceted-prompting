@@ -136,5 +136,18 @@ order:                       # Optional: user-message section order
 - **File paths** starting with `./`, `../`, `/`, `~` or ending with `.md` are resolved relative to the compose definition directory for relative paths
 - **File path boundaries** require the real path to stay inside the compose definition directory or configured facets roots; symlinks and paths outside those roots fail
 - **Scope references** (`@owner/repo/name`) require repertoire roots and resolve from `~/.faceted/repertoire/`
+- **Inline instructions** are kept as prompt content when an instruction entry is not resolved as a facet name or file path
 
 If `order` is omitted, the user-message section order is `knowledge`, `instructions`, `output-contracts`, then `policies`. The YAML key is `output-contracts`; the TypeScript API exposes it as `outputContracts`.
+
+### Instruction partial includes
+
+Instruction facet files may include shared Markdown partials with this syntax:
+
+```md
+{{include:instructions/review-common}}
+```
+
+`{{include:instructions/review-common}}` resolves to `facets/partials/instructions/review-common.md` and expands in place before the composed prompt is written. Repertoire partials use `{{include:instructions/@owner/repo/<name>}}` and resolve from `repertoire/@owner/repo/facets/partials/instructions/<name>.md`. The feature is instruction-only; other facet kinds are not expanded. Shortened forms such as `{{include:review-common}}` are rejected.
+
+When both local and global faceted roots are available, partials follow local-first resolution: `.faceted/facets/partials/instructions/` is checked before `~/.faceted/facets/partials/instructions/`. Missing includes and cyclic include chains stop the command with an explicit error. The partial source paths are included in `composePromptPayload().copyFiles.instructionPartials` only when includes are used, so install and copy metadata can keep them separate from standalone instruction facets.

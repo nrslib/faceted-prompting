@@ -91,6 +91,8 @@ facet install skill
 │   ├── knowledge/
 │   ├── policies/
 │   ├── instructions/
+│   ├── partials/
+│   │   └── instructions/
 │   └── output-contracts/
 ├── compositions/
 └── templates/
@@ -102,6 +104,8 @@ facet install skill
 │   ├── knowledge/        # Domain knowledge files
 │   ├── policies/         # Policy/rules files
 │   ├── instructions/     # Instruction files
+│   ├── partials/
+│   │   └── instructions/ # Reusable instruction-only Markdown partials
 │   └── output-contracts/ # Output/report format files
 ├── compositions/         # Compose definition YAML files
 └── templates/            # Skill templates
@@ -143,10 +147,22 @@ order:
 ```
 
 - `name` and `persona` are required.
-- `order` controls user-message section order (default: `knowledge` → `instructions` → `output-contracts` → `policies`).
-- `instructions` is a list of facet names, file paths, or scope references.
+- `order` controls user-message section order (default: `knowledge` -> `instructions` -> `output-contracts` -> `policies`).
+- `instructions` is a list of instruction facet names, Markdown file paths, scope references, or inline Markdown text.
 - `output-contracts` is a list of facet names, file paths, or scope references and is exposed as `outputContracts` in the TypeScript API.
 - Relative file paths are resolved from the compose definition directory. Real paths must stay inside that directory or the configured facets roots; symlinks and paths outside those roots fail.
+
+Instruction facet files can include shared Markdown partials:
+
+```md
+Review the change for mergeable quality.
+
+{{include:instructions/review-common}}
+```
+
+The include above resolves to `facets/partials/instructions/review-common.md` and expands at the include site before prompt composition. Includes are supported only in instruction facets. The supported syntax is `{{include:instructions/<name>}}` for local/global partials and `{{include:instructions/@owner/repo/<name>}}` for repertoire partials under `repertoire/@owner/repo/facets/partials/instructions/<name>.md`; shortened forms such as `{{include:review-common}}` are invalid.
+
+Instruction partials use the same local-first layering as facets: `.faceted/facets/partials/instructions/` is checked before `~/.faceted/facets/partials/instructions/`. Missing includes and cyclic include chains fail with explicit errors. `composePromptPayload().copyFiles.instructions` includes instruction facet paths, and `composePromptPayload().copyFiles.instructionPartials` is present only when included partial paths exist.
 
 ## Scope References
 

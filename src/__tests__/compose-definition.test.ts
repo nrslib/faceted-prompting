@@ -76,7 +76,7 @@ describe('loadComposeDefinition', () => {
         'policies:',
         '  - quality',
         'instructions:',
-        '  - Prepare release notes.',
+        '  - release-notes',
         'order:',
         '  - policies',
         '  - knowledge',
@@ -88,10 +88,10 @@ describe('loadComposeDefinition', () => {
     const { loadComposeDefinition } = await loadComposeDefinitionModule();
     const loaded = await loadComposeDefinition(definitionPath);
     expect(loaded.name).toBe('release-note');
+    expect(loaded.order).toEqual(['policies', 'knowledge', 'instructions']);
     expect(loaded.description).toBeUndefined();
     expect(loaded.persona).toBe('coder');
-    expect(loaded.instructions).toEqual(['Prepare release notes.']);
-    expect(loaded.order).toEqual(['policies', 'knowledge', 'instructions']);
+    expect(loaded.instructions).toEqual(['release-notes']);
   });
 
   it('should ignore persona in order entries and preserve the remaining order', async () => {

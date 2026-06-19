@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
+import { composePromptPayload } from '../prompt-payload.js';
 
 type CliModule = {
   runFacetCli: (args: string[], options: {
@@ -81,6 +82,61 @@ function createFacetedFixtureAtRoot(facetedRoot: string): {
   return { compositionsRoot };
 }
 
+function createTemplateBackedSkillFixture(homeDir: string): void {
+  const facetedRoot = join(homeDir, '.faceted');
+  const facetsRoot = join(facetedRoot, 'facets');
+  const compositionsRoot = join(facetedRoot, 'compositions');
+  const templateRoot = join(facetedRoot, 'templates', 'starter-kit');
+
+  mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'policies'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'knowledge'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'partials/instructions'), { recursive: true });
+  mkdirSync(compositionsRoot, { recursive: true });
+  mkdirSync(templateRoot, { recursive: true });
+
+  writeFileSync(join(facetedRoot, 'config.yaml'), 'version: 1\n', 'utf-8');
+  writeFileSync(join(facetsRoot, 'persona', 'coder.md'), 'You are a template coding agent.', 'utf-8');
+  writeFileSync(join(facetsRoot, 'policies', 'coding.md'), 'Template coding policy.', 'utf-8');
+  writeFileSync(join(facetsRoot, 'knowledge', 'architecture.md'), 'Template architecture knowledge.', 'utf-8');
+  writeFileSync(
+    join(facetsRoot, 'instructions', 'keep-deterministic.md'),
+    'Keep template output deterministic.\n{{include:instructions/review-common}}',
+    'utf-8',
+  );
+  writeFileSync(
+    join(facetsRoot, 'partials/instructions', 'review-common.md'),
+    'Review template evidence before reporting.',
+    'utf-8',
+  );
+  writeFileSync(
+    join(compositionsRoot, 'templated.yaml'),
+    [
+      'name: templated',
+      'persona: coder',
+      'knowledge:',
+      '  - architecture',
+      'policies:',
+      '  - coding',
+      'instructions:',
+      '  - keep-deterministic',
+      'template: starter-kit',
+    ].join('\n'),
+    'utf-8',
+  );
+  writeFileSync(
+    join(templateRoot, 'SKILL.md'),
+    [
+      '## Persona',
+      '{{facet:persona}}',
+      '## Instructions',
+      '{{facet:instructions}}',
+    ].join('\n'),
+    'utf-8',
+  );
+}
+
 function createFacetedFixture(homeDir: string): {
   compositionsRoot: string;
 } {
@@ -97,6 +153,15 @@ function createSelectStub(expectedSelections: readonly string[]) {
     expect(candidates).toContain(next);
     return next;
   };
+}
+
+function expectTextOrder(text: string, orderedValues: readonly string[]): void {
+  let previousIndex = -1;
+  for (const value of orderedValues) {
+    const index = text.indexOf(value);
+    expect(index).toBeGreaterThan(previousIndex);
+    previousIndex = index;
+  }
 }
 
 describe('facet skill integration flow', () => {
@@ -136,6 +201,309 @@ describe('facet skill integration flow', () => {
     expect(skillBody.indexOf('## Knowledge')).toBeLessThan(skillBody.indexOf('## Instructions'));
     expect(skillBody.indexOf('## Instructions')).toBeLessThan(skillBody.indexOf('## Output Contracts'));
     expect(skillBody.indexOf('## Output Contracts')).toBeLessThan(skillBody.indexOf('## Policies'));
+  });
+
+  it('should keep generated skill sections in compose order when compose order differs', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    const { compositionsRoot } = createFacetedFixture(homeDir);
+    const facetsRoot = join(homeDir, '.faceted', 'facets');
+    mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
+    writeFileSync(join(facetsRoot, 'instructions', 'ship-carefully.md'), 'Ship carefully.', 'utf-8');
+    writeFileSync(
+      join(compositionsRoot, 'coding.yaml'),
+      [
+        'name: coding',
+        'description: Coding workflow',
+        'persona: coder',
+        'policies:',
+        '  - coding',
+        'knowledge:',
+        '  - architecture',
+        'instructions:',
+        '  - ship-carefully',
+        'order:',
+        '  - knowledge',
+        '  - instructions',
+        '  - policies',
+      ].join('\n'),
+      'utf-8',
+    );
+
+    const skillOutputPath = join(homeDir, '.claude', 'skills', 'coding', 'SKILL.md');
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli(['install', 'skill'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['coding (global)', 'Claude Code']),
+      input: async (prompt, defaultValue) =>
+        prompt.toLowerCase().includes('output') ? skillOutputPath : defaultValue,
+    });
+
+    expect(result).toEqual({ kind: 'path', path: skillOutputPath });
+    expectTextOrder(readFileSync(skillOutputPath, 'utf-8'), [
+      '## Persona',
+      '## Knowledge',
+      '## Instructions',
+      '## Policies',
+    ]);
+  });
+
+  it('should install instruction partials outside standalone instruction facets', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    const { compositionsRoot } = createFacetedFixture(homeDir);
+
+    const facetsRoot = join(homeDir, '.faceted', 'facets');
+    mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
+    mkdirSync(join(facetsRoot, 'partials/instructions'), { recursive: true });
+    writeFileSync(
+      join(compositionsRoot, 'coding.yaml'),
+      [
+        'name: coding',
+        'description: Coding workflow',
+        'persona: coder',
+        'policies:',
+        '  - coding',
+        'knowledge:',
+        '  - architecture',
+        'instructions:',
+        '  - keep-changes-small',
+      ].join('\n'),
+      'utf-8',
+    );
+    writeFileSync(
+      join(facetsRoot, 'instructions', 'keep-changes-small.md'),
+      [
+        'Review whether the current change is mergeable quality.',
+        '{{include:instructions/review-common}}',
+        'Keep changes small and explicit.',
+      ].join('\n'),
+      'utf-8',
+    );
+    writeFileSync(
+      join(facetsRoot, 'partials/instructions', 'review-common.md'),
+      'Review the original task requirements and execution evidence.',
+      'utf-8',
+    );
+
+    const skillOutputPath = join(homeDir, '.claude', 'skills', 'coding', 'SKILL.md');
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli(['install', 'skill'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['coding (global)', 'Claude Code']),
+      input: async (prompt, defaultValue) =>
+        prompt.toLowerCase().includes('output') ? skillOutputPath : defaultValue,
+    });
+
+    expect(result).toEqual({ kind: 'path', path: skillOutputPath });
+    expect(readFileSync(skillOutputPath, 'utf-8')).toContain(
+      'Review the original task requirements and execution evidence.',
+    );
+    expect(
+      existsSync(join(homeDir, '.claude', 'skills', 'coding', 'facets', 'instructions', 'keep-changes-small.md')),
+    ).toBe(true);
+    expect(
+      existsSync(join(homeDir, '.claude', 'skills', 'coding', 'facets', 'partials/instructions', 'review-common.md')),
+    ).toBe(true);
+    expect(
+      existsSync(join(homeDir, '.claude', 'skills', 'coding', 'facets', 'instructions', 'review-common.md')),
+    ).toBe(false);
+  });
+
+  it('should install scoped instruction partials so copied facets can be recomposed', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    const { compositionsRoot } = createFacetedFixture(homeDir);
+
+    const facetsRoot = join(homeDir, '.faceted', 'facets');
+    const repertoirePartialPath = join(
+      homeDir,
+      '.faceted',
+      'repertoire',
+      '@acme',
+      'review-pack',
+      'facets',
+      'partials/instructions',
+      'review-common.md',
+    );
+    mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
+    mkdirSync(dirname(repertoirePartialPath), { recursive: true });
+    writeFileSync(
+      join(compositionsRoot, 'coding.yaml'),
+      [
+        'name: coding',
+        'description: Coding workflow',
+        'persona: coder',
+        'policies:',
+        '  - coding',
+        'knowledge:',
+        '  - architecture',
+        'instructions:',
+        '  - keep-changes-small',
+      ].join('\n'),
+      'utf-8',
+    );
+    writeFileSync(
+      join(facetsRoot, 'instructions', 'keep-changes-small.md'),
+      [
+        'Review whether the current change is mergeable quality.',
+        '{{include:instructions/@acme/review-pack/review-common}}',
+        'Keep changes small and explicit.',
+      ].join('\n'),
+      'utf-8',
+    );
+    writeFileSync(
+      repertoirePartialPath,
+      'Review the original task requirements and execution evidence.',
+      'utf-8',
+    );
+
+    const skillOutputPath = join(homeDir, '.claude', 'skills', 'coding', 'SKILL.md');
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli(['install', 'skill'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['coding (global)', 'Claude Code']),
+      input: async (prompt, defaultValue) =>
+        prompt.toLowerCase().includes('output') ? skillOutputPath : defaultValue,
+    });
+
+    const skillDir = dirname(skillOutputPath);
+    const copiedFacetsRoot = join(skillDir, 'facets');
+    const copiedScopedPartialPath = join(
+      skillDir,
+      'repertoire',
+      '@acme',
+      'review-pack',
+      'facets',
+      'partials/instructions',
+      'review-common.md',
+    );
+    expect(result).toEqual({ kind: 'path', path: skillOutputPath });
+    expect(existsSync(copiedScopedPartialPath)).toBe(true);
+    expect(existsSync(join(copiedFacetsRoot, 'partials/instructions', 'review-common.md'))).toBe(false);
+
+    const recomposed = composePromptPayload({
+      definition: {
+        name: 'coding',
+        persona: 'coder',
+        policies: ['coding'],
+        knowledge: ['architecture'],
+        instructions: ['keep-changes-small'],
+      },
+      definitionDir: skillDir,
+      facetsRoot: copiedFacetsRoot,
+      composeOptions: {
+        contextMaxChars: 8000,
+      },
+    });
+
+    expect(recomposed.userPrompt).toContain('Review the original task requirements and execution evidence.');
+    expect(recomposed.userPrompt).not.toContain('{{include:instructions/@acme/review-pack/review-common}}');
+  });
+
+  it('should install template-backed skill with expanded instruction partials', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    createTemplateBackedSkillFixture(homeDir);
+
+    const skillOutputPath = join(homeDir, '.claude', 'skills', 'templated', 'SKILL.md');
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli(['install', 'skill'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['templated (global)', 'Claude Code']),
+      input: async (prompt, defaultValue) =>
+        prompt.toLowerCase().includes('output') ? skillOutputPath : defaultValue,
+    });
+
+    expect(result).toEqual({ kind: 'path', path: skillOutputPath });
+    const skillBody = readFileSync(skillOutputPath, 'utf-8');
+    expect(skillBody).toContain('Keep template output deterministic.');
+    expect(skillBody).toContain('Review template evidence before reporting.');
+    expect(skillBody).not.toContain('{{include:instructions/review-common}}');
+    expect(
+      existsSync(join(homeDir, '.claude', 'skills', 'templated', 'facets', 'partials/instructions', 'review-common.md')),
+    ).toBe(true);
+    expect(
+      existsSync(join(homeDir, '.claude', 'skills', 'templated', 'facets', 'instructions', 'review-common.md')),
+    ).toBe(false);
+  });
+
+  it('should not replace facet tokens inside copied scoped instruction partials', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    const facetedRoot = join(homeDir, '.faceted');
+    const facetsRoot = join(facetedRoot, 'facets');
+    const compositionsRoot = join(facetedRoot, 'compositions');
+    const templateRoot = join(facetedRoot, 'templates', 'starter-kit');
+    const scopedPartialPath = join(
+      facetedRoot,
+      'repertoire',
+      '@acme',
+      'review-pack',
+      'facets',
+      'partials/instructions',
+      'review-common.md',
+    );
+
+    mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
+    mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
+    mkdirSync(compositionsRoot, { recursive: true });
+    mkdirSync(templateRoot, { recursive: true });
+    mkdirSync(dirname(scopedPartialPath), { recursive: true });
+    writeFileSync(join(facetedRoot, 'config.yaml'), 'version: 1\n', 'utf-8');
+    writeFileSync(join(facetsRoot, 'persona', 'coder.md'), 'You are a template coding agent.', 'utf-8');
+    writeFileSync(
+      join(facetsRoot, 'instructions', 'keep-deterministic.md'),
+      'Keep template output deterministic.\n{{include:instructions/@acme/review-pack/review-common}}',
+      'utf-8',
+    );
+    writeFileSync(scopedPartialPath, 'Keep {{facet:persona}} literal in copied partial.', 'utf-8');
+    writeFileSync(
+      join(compositionsRoot, 'templated.yaml'),
+      [
+        'name: templated',
+        'persona: coder',
+        'instructions:',
+        '  - keep-deterministic',
+        'template: starter-kit',
+      ].join('\n'),
+      'utf-8',
+    );
+    writeFileSync(join(templateRoot, 'SKILL.md'), '{{facet:instructions}}\n', 'utf-8');
+
+    const skillOutputPath = join(homeDir, '.claude', 'skills', 'templated', 'SKILL.md');
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli(['install', 'skill'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['templated (global)', 'Claude Code']),
+      input: async (prompt, defaultValue) =>
+        prompt.toLowerCase().includes('output') ? skillOutputPath : defaultValue,
+    });
+
+    const copiedScopedPartialPath = join(
+      dirname(skillOutputPath),
+      'repertoire',
+      '@acme',
+      'review-pack',
+      'facets',
+      'partials/instructions',
+      'review-common.md',
+    );
+    expect(result).toEqual({ kind: 'path', path: skillOutputPath });
+    expect(readFileSync(copiedScopedPartialPath, 'utf-8')).toBe(
+      'Keep {{facet:persona}} literal in copied partial.',
+    );
   });
 
   it('should prefer local composition and facets while falling back to global facets for missing refs', async () => {

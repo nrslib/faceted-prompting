@@ -1,8 +1,10 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { isResourcePath, resolveResourcePath } from '../resolve.js';
 import { isScopeRef, parseScopeRef, resolveScopeRef } from '../scope.js';
 import { ensurePathWithinRoots } from './path-guard.js';
+import { expandInstructionIncludes } from './instruction-includes.js';
+import { instructionPartialsDir } from '../instruction-partial-paths.js';
 import type { ComposeDefinition, FacetKind, FacetSet } from '../types.js';
 import type {
   InstructionSection,
@@ -36,11 +38,34 @@ function resolveFacetRefContent(options: {
   repertoireRoots: readonly string[];
   scopeFacetKind: FacetKind;
 }): { body: string; path: string } {
+  const resolved = resolveOptionalFacetRefContent(options);
+  if (resolved) {
+    return resolved;
+  }
+
+  const primaryFacetDir = options.facetDirs[0];
+  if (!primaryFacetDir) {
+    throw new Error(`Missing ${options.label}: facet directory is required`);
+  }
+  throw new Error(`Missing ${options.label}: ${join(primaryFacetDir, `${options.ref}.md`)}`);
+}
+
+function resolveOptionalFacetRefContent(options: {
+  ref: string;
+  label: string;
+  baseDir: string;
+  facetDirs: readonly string[];
+  allowedRoots: readonly string[];
+  resourceAllowedRoots: readonly string[];
+  repertoireRoots: readonly string[];
+  scopeFacetKind: FacetKind;
+}): { body: string; path: string } | undefined {
   const { ref, label, baseDir, facetDirs, allowedRoots, resourceAllowedRoots, repertoireRoots, scopeFacetKind } = options;
   const primaryFacetDir = facetDirs[0];
   if (!primaryFacetDir) {
     throw new Error(`Missing ${label}: facet directory is required`);
   }
+
   if (isScopeRef(ref)) {
     if (repertoireRoots.length === 0) {
       throw new Error(`Missing ${label}: scope reference requires repertoire roots`);
@@ -56,10 +81,14 @@ function resolveFacetRefContent(options: {
     }
     throw new Error(`Missing ${label}: ${resolveScopeRef(scopeRef, scopeFacetKind, repertoireRoots[0]!)}`);
   }
+
   if (isResourcePath(ref)) {
     const resourcePath = resolveResourcePath(ref, baseDir);
+    if (!existsSync(resourcePath)) {
+      throw new Error(`Missing ${label}: ${resourcePath}`);
+    }
     const boundedPath = ensurePathWithinRoots(resourcePath, resourceAllowedRoots, label);
-    return { path: boundedPath, body: requireFile(boundedPath, label) };
+    return { path: boundedPath, body: readFileSync(boundedPath, 'utf-8') };
   }
 
   for (const facetDir of facetDirs) {
@@ -71,7 +100,7 @@ function resolveFacetRefContent(options: {
     return { path: boundedPath, body: requireFile(boundedPath, label) };
   }
 
-  throw new Error(`Missing ${label}: ${join(primaryFacetDir, `${ref}.md`)}`);
+  return undefined;
 }
 
 function resolveFacetsRoots(params: {
@@ -96,16 +125,21 @@ export function resolveDefinitionSections(params: {
 }): ResolvedDefinitionSections {
   const { definition, definitionDir } = params;
   const facetsRoots = resolveFacetsRoots(params);
-  const allowedRoots = facetsRoots;
+  const facetAllowedRoots = facetsRoots;
   const resourceAllowedRoots = [definitionDir, ...facetsRoots];
   const repertoireRoots = params.facetedRoots?.map(facetedRoot => join(facetedRoot, 'repertoire')) ?? [];
+  const instructionIncludeRepertoireRoots =
+    repertoireRoots.length > 0
+      ? repertoireRoots
+      : facetsRoots.map(facetsRoot => join(dirname(facetsRoot), 'repertoire'));
+  const includeAllowedRoots = [...facetsRoots, ...instructionIncludeRepertoireRoots];
 
   const personaContent = resolveFacetRefContent({
     ref: definition.persona,
     label: `persona facet "${definition.persona}"`,
     baseDir: definitionDir,
     facetDirs: facetsRoots.map(facetsRoot => join(facetsRoot, 'persona')),
-    allowedRoots,
+    allowedRoots: facetAllowedRoots,
     resourceAllowedRoots,
     repertoireRoots,
     scopeFacetKind: 'personas',
@@ -118,7 +152,7 @@ export function resolveDefinitionSections(params: {
         label: `policy facet "${ref}"`,
         baseDir: definitionDir,
         facetDirs: facetsRoots.map(facetsRoot => join(facetsRoot, 'policies')),
-        allowedRoots,
+        allowedRoots: facetAllowedRoots,
         resourceAllowedRoots,
         repertoireRoots,
         scopeFacetKind: 'policies',
@@ -133,7 +167,7 @@ export function resolveDefinitionSections(params: {
         label: `knowledge facet "${ref}"`,
         baseDir: definitionDir,
         facetDirs: facetsRoots.map(facetsRoot => join(facetsRoot, 'knowledge')),
-        allowedRoots,
+        allowedRoots: facetAllowedRoots,
         resourceAllowedRoots,
         repertoireRoots,
         scopeFacetKind: 'knowledge',
@@ -143,17 +177,34 @@ export function resolveDefinitionSections(params: {
 
   const instructions: InstructionSection[] =
     definition.instructions?.map(ref => {
-      const resolved = resolveFacetRefContent({
+      const resolved = resolveOptionalFacetRefContent({
         ref,
         label: `instruction facet "${ref}"`,
         baseDir: definitionDir,
         facetDirs: facetsRoots.map(facetsRoot => join(facetsRoot, 'instructions')),
-        allowedRoots,
+        allowedRoots: facetAllowedRoots,
         resourceAllowedRoots,
         repertoireRoots,
         scopeFacetKind: 'instructions',
       });
-      return { ref, body: resolved.body, path: resolved.path };
+
+      if (!resolved) {
+        return { ref: 'literal', body: ref };
+      }
+
+      const expanded = expandInstructionIncludes({
+        body: resolved.body,
+        partialDirs: facetsRoots.map(facetsRoot => instructionPartialsDir(facetsRoot)),
+        repertoireDirs: instructionIncludeRepertoireRoots,
+        allowedRoots: includeAllowedRoots,
+      });
+
+      return {
+        ref,
+        body: expanded.body,
+        path: resolved.path,
+        sourcePaths: [resolved.path, ...expanded.sourcePaths],
+      };
     }) ?? [];
 
   const outputContracts: SkillSection[] =
@@ -163,7 +214,7 @@ export function resolveDefinitionSections(params: {
         label: `output-contracts facet "${ref}"`,
         baseDir: definitionDir,
         facetDirs: facetsRoots.map(facetsRoot => join(facetsRoot, 'output-contracts')),
-        allowedRoots,
+        allowedRoots: facetAllowedRoots,
         resourceAllowedRoots,
         repertoireRoots,
         scopeFacetKind: 'output-contracts',

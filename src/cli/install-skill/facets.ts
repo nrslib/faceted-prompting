@@ -1,11 +1,5 @@
-import { basename, join } from 'node:path';
-import {
-  copyFileSync,
-  mkdirSync,
-  readdirSync,
-  realpathSync,
-  writeFileSync,
-} from 'node:fs';
+import { basename, dirname, join } from 'node:path';
+import { copyFileSync, mkdirSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import type { buildSkillSections } from '../skill-renderer.js';
 import type { CopyFiles } from '../../types.js';
 import { isWithinRoot } from '../path-guard.js';
@@ -16,6 +10,8 @@ import {
 } from './facet-token-file-ops.js';
 import { hasFacetToken, replaceFacetTokens } from './facet-token-renderer.js';
 import type { FacetTokenValues } from './facet-token-renderer.js';
+import { instructionPartialTargetPath } from './instruction-partial-copy.js';
+import { instructionPartialsDir } from '../../instruction-partial-paths.js';
 
 export type SkillSections = ReturnType<typeof buildSkillSections>;
 
@@ -25,6 +21,7 @@ export interface FacetPathMap {
   readonly policies: readonly string[];
   readonly instructions: readonly string[];
   readonly outputContracts: readonly string[];
+  readonly instructionPartials: readonly string[];
 }
 
 function requireFacetPathCount(params: {
@@ -88,10 +85,7 @@ function applyFacetTokensToSingleFile(params: {
   }
 }
 
-export function buildSectionsWithCopiedPaths(
-  sections: SkillSections,
-  facets: FacetPathMap,
-): SkillSections {
+export function buildSectionsWithCopiedPaths(sections: SkillSections, facets: FacetPathMap): SkillSections {
   requireFacetPathCount({
     label: 'knowledge',
     expected: sections.knowledge.length,
@@ -137,6 +131,7 @@ export function buildSectionsWithCopiedPaths(
           ref: basename(instructionPath, '.md'),
           body: instruction.body,
           path: instructionPath,
+          sourcePaths: [instructionPath],
         };
       }
       return instruction;
@@ -163,6 +158,7 @@ export function copyFacetFiles(params: {
   const knowledgeDir = join(facetsDir, 'knowledge');
   const policiesDir = join(facetsDir, 'policies');
   const instructionsDir = join(facetsDir, 'instructions');
+  const partialsDir = instructionPartialsDir(facetsDir);
   const outputContractsDir = join(facetsDir, 'output-contracts');
 
   mkdirSync(personaDir, { recursive: true });
@@ -189,6 +185,17 @@ export function copyFacetFiles(params: {
     return targetPath;
   });
 
+  const instructionPartialPaths = (params.copyFiles.instructionPartials ?? []).map(path => {
+    const targetPath = instructionPartialTargetPath({
+      sourcePath: path,
+      targetDir: params.targetDir,
+      instructionPartialsDir: partialsDir,
+    });
+    mkdirSync(dirname(targetPath), { recursive: true });
+    copyFileSync(path, targetPath);
+    return targetPath;
+  });
+
   const outputContractPaths = params.copyFiles.outputContracts.map(path => {
     const targetPath = join(outputContractsDir, basename(path));
     copyFileSync(path, targetPath);
@@ -207,9 +214,12 @@ export function copyFacetFiles(params: {
         copyFileSync(sourceInstructionPath, targetPath);
         instructionPaths.push(targetPath);
       }
-    } else if (params.literalInstructionBodies) {
+    }
+    if (params.literalInstructionBodies) {
       for (let i = 0; i < params.literalInstructionBodies.length; i++) {
-        const suffix = params.literalInstructionBodies.length === 1 ? '' : `-${i + 1}`;
+        const suffix = hasSourceInstructions
+          ? `-inline-${i + 1}`
+          : params.literalInstructionBodies.length === 1 ? '' : `-${i + 1}`;
         const targetPath = join(instructionsDir, `${params.safeSkillName}${suffix}.md`);
         writeFileSync(targetPath, normalizeInstructionBody(params.literalInstructionBodies[i] ?? ''), 'utf-8');
         instructionPaths.push(targetPath);
@@ -223,6 +233,7 @@ export function copyFacetFiles(params: {
     policies: policyPaths,
     instructions: instructionPaths,
     outputContracts: outputContractPaths,
+    instructionPartials: instructionPartialPaths,
   };
 }
 
@@ -266,11 +277,9 @@ export function applyFacetTokensToPath(params: {
   visit(rootDir, 0);
 }
 
-export function applyFacetTokensToFiles(params: {
-  filePaths: readonly string[];
-  tokenValues: FacetTokenValues;
-  rootDir: string;
-}): void {
+export function applyFacetTokensToFiles(
+  params: { filePaths: readonly string[]; tokenValues: FacetTokenValues; rootDir: string },
+): void {
   for (const filePath of params.filePaths) {
     applyFacetTokensToSingleFile({
       filePath,
