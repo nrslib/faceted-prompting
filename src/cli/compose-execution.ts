@@ -140,6 +140,7 @@ export async function runTemplateBackedCompose(params: {
   const sections = buildSkillSections({
     definition: params.definition,
     definitionDir: dirname(params.definitionPath),
+    facetedRoots: params.facetedRoots,
     facetsRoots: params.facetsRoots,
   });
 
@@ -157,6 +158,7 @@ export async function runTemplateBackedCompose(params: {
 
 export async function runStandardCompose(params: {
   options: FacetCliOptions;
+  facetedRoots: readonly string[];
   facetsRoots: readonly string[];
   definitionPath: string;
   definition: ComposeDefinition;
@@ -165,6 +167,7 @@ export async function runStandardCompose(params: {
   const safeName = ensureSafeDefinitionName(params.definition.name);
   const facetSet = buildFacetSet({
     definitionDir: dirname(params.definitionPath),
+    facetedRoots: params.facetedRoots,
     facetsRoots: params.facetsRoots,
     definition: params.definition,
   });

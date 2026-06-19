@@ -50,12 +50,16 @@ function createFacetedFixtureAtRoot(facetedRoot: string): {
   mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
   mkdirSync(join(facetsRoot, 'policies'), { recursive: true });
   mkdirSync(join(facetsRoot, 'knowledge'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'output-contracts'), { recursive: true });
   mkdirSync(compositionsRoot, { recursive: true });
 
   writeFileSync(join(facetedRoot, 'config.yaml'), 'version: 1\n', 'utf-8');
   writeFileSync(join(facetsRoot, 'persona', 'coder.md'), 'You are a coding agent.', 'utf-8');
   writeFileSync(join(facetsRoot, 'policies', 'coding.md'), 'Never hide errors.', 'utf-8');
   writeFileSync(join(facetsRoot, 'knowledge', 'architecture.md'), 'Architecture reference.', 'utf-8');
+  writeFileSync(join(facetsRoot, 'instructions', 'keep-changes-small.md'), 'Keep changes small and explicit.', 'utf-8');
+  writeFileSync(join(facetsRoot, 'output-contracts', 'review-report.md'), 'Return a structured review report.', 'utf-8');
   writeFileSync(
     join(compositionsRoot, 'coding.yaml'),
     [
@@ -66,6 +70,10 @@ function createFacetedFixtureAtRoot(facetedRoot: string): {
       '  - coding',
       'knowledge:',
       '  - architecture',
+      'instructions:',
+      '  - keep-changes-small',
+      'output-contracts:',
+      '  - review-report',
     ].join('\n'),
     'utf-8',
   );
@@ -121,7 +129,13 @@ describe('facet skill integration flow', () => {
 
     expect(result).toEqual({ kind: 'path', path: skillOutputPath });
     expect(existsSync(skillOutputPath)).toBe(true);
-    expect(readFileSync(skillOutputPath, 'utf-8')).toContain('You are a coding agent.');
+    const skillBody = readFileSync(skillOutputPath, 'utf-8');
+    expect(skillBody).toContain('You are a coding agent.');
+    expect(skillBody).toContain('## Output Contracts');
+    expect(skillBody).toContain('Return a structured review report.');
+    expect(skillBody.indexOf('## Knowledge')).toBeLessThan(skillBody.indexOf('## Instructions'));
+    expect(skillBody.indexOf('## Instructions')).toBeLessThan(skillBody.indexOf('## Output Contracts'));
+    expect(skillBody.indexOf('## Output Contracts')).toBeLessThan(skillBody.indexOf('## Policies'));
   });
 
   it('should prefer local composition and facets while falling back to global facets for missing refs', async () => {

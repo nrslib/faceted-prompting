@@ -51,6 +51,7 @@ function createFacetedFixture(homeDir: string): void {
   mkdirSync(join(facetsRoot, 'knowledge'), { recursive: true });
   mkdirSync(join(facetsRoot, 'policies'), { recursive: true });
   mkdirSync(join(facetsRoot, 'instructions'), { recursive: true });
+  mkdirSync(join(facetsRoot, 'output-contracts'), { recursive: true });
   mkdirSync(compositionsRoot, { recursive: true });
   mkdirSync(templatesRoot, { recursive: true });
 
@@ -59,6 +60,7 @@ function createFacetedFixture(homeDir: string): void {
   writeFileSync(join(facetsRoot, 'knowledge', 'architecture.md'), 'Architecture reference.', 'utf-8');
   writeFileSync(join(facetsRoot, 'policies', 'coding.md'), 'Never hide errors.', 'utf-8');
   writeFileSync(join(facetsRoot, 'instructions', 'keep-changes-small.md'), 'Keep changes small and explicit.', 'utf-8');
+  writeFileSync(join(facetsRoot, 'output-contracts', 'review-report.md'), 'Return a structured review report.', 'utf-8');
 
   writeFileSync(
     join(compositionsRoot, 'templated.yaml'),
@@ -71,6 +73,8 @@ function createFacetedFixture(homeDir: string): void {
       '  - coding',
       'instructions:',
       '  - keep-changes-small',
+      'output-contracts:',
+      '  - review-report',
       'template: starter-kit',
     ].join('\n'),
     'utf-8',
@@ -101,6 +105,7 @@ function createFacetedFixture(homeDir: string): void {
       'knowledge={{facet:knowledges}}',
       'policies={{facet:policies}}',
       'instructions={{facet:instructions}}',
+      'outputContracts={{facet:outputContracts}}',
     ].join('\n'),
     'utf-8',
   );
@@ -134,12 +139,18 @@ describe('facet install template-backed skill integration flow', () => {
 
     expect(result).toEqual({ kind: 'path', path: skillOutputPath });
     expect(readFileSync(skillOutputPath, 'utf-8')).toMatch(/^---\nname: templated-skill\n---\n/m);
-    expect(readFileSync(skillOutputPath, 'utf-8')).toContain('You are a coding agent.');
-    expect(readFileSync(skillOutputPath, 'utf-8')).not.toContain('/facets/persona/coder.md');
+    const skillBody = readFileSync(skillOutputPath, 'utf-8');
+    expect(skillBody).toContain('You are a coding agent.');
+    expect(skillBody).toContain('Return a structured review report.');
+    expect(skillBody).not.toContain('/facets/persona/coder.md');
+    expect(skillBody).not.toContain('{{facet:outputContracts}}');
     expect(readFileSync(join(homeDir, '.agents', 'skills', 'templated-skill', 'README.md'), 'utf-8')).toBe(
       'template file',
     );
     expect(existsSync(join(homeDir, '.agents', 'skills', 'templated-skill', 'facets', 'persona', 'coder.md'))).toBe(
+      true,
+    );
+    expect(existsSync(join(homeDir, '.agents', 'skills', 'templated-skill', 'facets', 'output-contracts', 'review-report.md'))).toBe(
       true,
     );
   });

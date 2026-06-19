@@ -1,8 +1,13 @@
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { applyFacetTokensToFiles, applyFacetTokensToPath } from '../cli/install-skill/facets.js';
+import {
+  applyFacetTokensToFiles,
+  applyFacetTokensToPath,
+  buildInlineFacetTokenValues,
+  copyFacetFiles,
+} from '../cli/install-skill/facets.js';
 
 function tokenValues() {
   return {
@@ -10,6 +15,7 @@ function tokenValues() {
     knowledges: 'Knowledge Body',
     policies: 'Policy Body',
     instructions: 'Instruction Body',
+    outputContracts: 'Output Contract Body',
   };
 }
 
@@ -35,6 +41,7 @@ describe('applyFacetTokens*', () => {
         'knowledge: {{facet:knowledges}}',
         'policy: {{facet:policies}}',
         'instruction: {{facet:instructions}}',
+        'output-contract: {{facet:outputContracts}}',
       ].join('\n');
       writeFileSync(join(rootByScan, 'prompt.yaml'), templatedBody, 'utf-8');
       writeFileSync(join(rootByList, 'prompt.yaml'), templatedBody, 'utf-8');
@@ -55,6 +62,9 @@ describe('applyFacetTokens*', () => {
 
       expect(readFileSync(join(rootByScan, 'prompt.yaml'), 'utf-8')).toBe(
         readFileSync(join(rootByList, 'prompt.yaml'), 'utf-8'),
+      );
+      expect(readFileSync(join(rootByScan, 'prompt.yaml'), 'utf-8')).toContain(
+        'output-contract: Output Contract Body',
       );
       expect(readFileSync(join(rootByList, 'README.md'), 'utf-8')).toBe('no token');
     } finally {
@@ -244,5 +254,72 @@ describe('applyFacetTokens*', () => {
     } finally {
       rmSync(workspaceDir, { recursive: true, force: true });
     }
+  });
+
+  it('should copy output-contracts facets into their facet directory', () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-facets-'));
+
+    try {
+      const sourceDir = join(workspaceDir, 'source');
+      const targetDir = join(workspaceDir, 'target');
+      mkdirSync(sourceDir, { recursive: true });
+      mkdirSync(targetDir, { recursive: true });
+
+      const personaPath = join(sourceDir, 'coder.md');
+      const outputContractPath = join(sourceDir, 'test-report.md');
+      writeFileSync(personaPath, 'Persona Body', 'utf-8');
+      writeFileSync(outputContractPath, 'Output Contract Body', 'utf-8');
+
+      const copied = copyFacetFiles({
+        targetDir,
+        safeSkillName: 'report-skill',
+        copyFiles: {
+          persona: [personaPath],
+          knowledge: [],
+          policies: [],
+          instructions: [],
+          outputContracts: [outputContractPath],
+        },
+      });
+
+      const copiedOutputContractPath = join(targetDir, 'facets', 'output-contracts', 'test-report.md');
+      expect(copied.outputContracts).toEqual([copiedOutputContractPath]);
+      expect(existsSync(copiedOutputContractPath)).toBe(true);
+      expect(readFileSync(copiedOutputContractPath, 'utf-8')).toBe('Output Contract Body');
+    } finally {
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should build output-contracts token values from skill sections', () => {
+    const values = buildInlineFacetTokenValues({
+      definition: {
+        name: 'report-skill',
+        persona: 'coder',
+        outputContracts: ['test-report', 'summary'],
+      },
+      persona: {
+        ref: 'coder',
+        body: 'Persona Body',
+        path: '/facets/persona/coder.md',
+      },
+      knowledge: [],
+      policies: [],
+      instructions: [],
+      outputContracts: [
+        {
+          ref: 'test-report',
+          body: 'Test Report Contract',
+          path: '/facets/output-contracts/test-report.md',
+        },
+        {
+          ref: 'summary',
+          body: 'Summary Contract',
+          path: '/facets/output-contracts/summary.md',
+        },
+      ],
+    });
+
+    expect(values.outputContracts).toBe('Test Report Contract\nSummary Contract');
   });
 });

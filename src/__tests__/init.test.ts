@@ -74,6 +74,17 @@ describe('initializeLocalFaceted', () => {
     expect(existsSync(join(facetedRoot, 'templates', 'issue-worktree', 'README.md'))).toBe(false);
   });
 
+  it('should keep compositions as a sibling of facets', async () => {
+    const cwd = mkdtempSync(join(tmpdir(), 'faceted-workspace-'));
+    tempDirs.push(cwd);
+
+    const { initializeLocalFaceted } = await loadInitModule();
+    await initializeLocalFaceted({ cwd });
+
+    expect(existsSync(join(cwd, '.faceted', 'compositions'))).toBe(true);
+    expect(existsSync(join(cwd, '.faceted', 'facets', 'compositions'))).toBe(false);
+  });
+
   it('should initialize config with extensible skillPaths field', async () => {
     const cwd = mkdtempSync(join(tmpdir(), 'faceted-workspace-'));
     tempDirs.push(cwd);

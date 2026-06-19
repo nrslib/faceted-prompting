@@ -1,11 +1,11 @@
-type FacetPlaceholderKey = 'persona' | 'knowledges' | 'policies' | 'instructions';
+type FacetPlaceholderKey = 'persona' | 'knowledges' | 'policies' | 'instructions' | 'outputContracts';
 
 export type FacetTokenValues = Record<FacetPlaceholderKey, string>;
 
 const FACET_TOKEN_PATTERN =
-  /{{\s*facet:(persona|knowledges|policies|instructions)(?:\s*\|\s*indent:(none))?\s*}}/g;
+  /{{\s*facet:(persona|knowledges|policies|instructions|outputContracts)(?:\s*\|\s*indent:(none))?\s*}}/g;
 const FACET_TOKEN_TEST =
-  /{{\s*facet:(persona|knowledges|policies|instructions)(?:\s*\|\s*indent:(none))?\s*}}/;
+  /{{\s*facet:(persona|knowledges|policies|instructions|outputContracts)(?:\s*\|\s*indent:(none))?\s*}}/;
 
 export function hasFacetToken(content: string): boolean {
   return FACET_TOKEN_TEST.test(content);

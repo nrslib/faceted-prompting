@@ -13,7 +13,7 @@ import { compose, FileDataEngine, renderTemplate } from 'faceted-prompting';
 Core composition function. Applies the facet placement rule:
 
 - `persona` → `systemPrompt`
-- `policies` + `knowledge` + `instruction` → `userMessage`
+- `knowledge` + `instructions` + `output-contracts` + `policies` → `userMessage`
 
 ```typescript
 function compose(facets: FacetSet, options: ComposeOptions): ComposedPrompt;
@@ -23,7 +23,7 @@ function compose(facets: FacetSet, options: ComposeOptions): ComposedPrompt;
 
 - `facets` — A `FacetSet` containing resolved facet contents
 - `options.contextMaxChars` — Maximum character length for knowledge/policy content before truncation
-- `options.userMessageOrder` — Optional section order (default: `['policies', 'knowledge', 'instruction']`)
+- `options.userMessageOrder` — Optional section order (default: `['knowledge', 'instructions', 'output-contracts', 'policies']`)
 
 **Returns:** `ComposedPrompt` with `systemPrompt` and `userMessage` strings.
 
@@ -35,10 +35,24 @@ Higher-level API that composes prompts from a `ComposeDefinition` and returns co
 function composePromptPayload(params: {
   definition: ComposeDefinition;
   definitionDir: string;
-  facetsRoot: string;
+  facetsRoot?: string;
+  facetsRoots?: readonly string[];
+  facetedRoots?: readonly string[];
   composeOptions: ComposeOptions;
 }): ComposedPromptPayload;
 ```
+
+**Parameters:**
+
+- `params.definition` — Compose definition to resolve and compose
+- `params.definitionDir` — Directory used as the base for definition-relative resource paths
+- `params.facetsRoot` — Single facets root, for callers that only use one root
+- `params.facetsRoots` — Ordered facets roots for first-match facet name resolution
+- `params.facetedRoots` — Ordered `.faceted` roots used to resolve repertoire scope references such as `@owner/repo/facet-name`
+- `params.composeOptions` — Composition options passed to `compose`
+
+At least one facet root is required through `facetsRoot` or a non-empty `facetsRoots`.
+Scope references require `facetedRoots`; calling this API with a scope reference and no repertoire roots fails with an error instead of falling back to a local facet name.
 
 **Returns:** `ComposedPromptPayload` with `systemPrompt`, `userPrompt`, and `copyFiles` (file paths used for each facet kind).
 
@@ -66,7 +80,8 @@ interface FacetSet {
   readonly persona?: FacetContent;
   readonly policies?: readonly FacetContent[];
   readonly knowledge?: readonly FacetContent[];
-  readonly instruction?: FacetContent;
+  readonly instructions?: readonly FacetContent[];
+  readonly outputContracts?: readonly FacetContent[];
 }
 ```
 
@@ -97,6 +112,7 @@ interface CopyFiles {
   readonly knowledge: readonly string[];
   readonly policies: readonly string[];
   readonly instructions: readonly string[];
+  readonly outputContracts: readonly string[];
 }
 ```
 
@@ -109,6 +125,10 @@ interface ComposeOptions {
 }
 ```
 
+```typescript
+type ComposeOrderEntry = 'policies' | 'knowledge' | 'instructions' | 'output-contracts';
+```
+
 ### `ComposeDefinition`
 
 ```typescript
@@ -119,7 +139,8 @@ interface ComposeDefinition {
   readonly template?: string;
   readonly knowledge?: readonly string[];
   readonly policies?: readonly string[];
-  readonly instruction?: string;
+  readonly instructions?: readonly string[];
+  readonly outputContracts?: readonly string[];
   readonly order?: readonly ComposeOrderEntry[];
 }
 ```
