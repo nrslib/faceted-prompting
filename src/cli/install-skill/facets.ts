@@ -1,4 +1,4 @@
-import { basename, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 import {
   copyFileSync,
   mkdirSync,
@@ -16,6 +16,7 @@ import {
 } from './facet-token-file-ops.js';
 import { hasFacetToken, replaceFacetTokens } from './facet-token-renderer.js';
 import type { FacetTokenValues } from './facet-token-renderer.js';
+import { instructionPartialTargetPath } from './instruction-partial-copy.js';
 
 export type SkillSections = ReturnType<typeof buildSkillSections>;
 
@@ -176,8 +177,12 @@ export function copyFacetFiles(params: {
   });
 
   const instructionPartialPaths = (params.copyFiles.instructionPartials ?? []).map(path => {
-    mkdirSync(instructionPartialsDir, { recursive: true });
-    const targetPath = join(instructionPartialsDir, basename(path));
+    const targetPath = instructionPartialTargetPath({
+      sourcePath: path,
+      targetDir: params.targetDir,
+      instructionPartialsDir,
+    });
+    mkdirSync(dirname(targetPath), { recursive: true });
     copyFileSync(path, targetPath);
     return targetPath;
   });
@@ -194,9 +199,12 @@ export function copyFacetFiles(params: {
         copyFileSync(sourceInstructionPath, targetPath);
         instructionPaths.push(targetPath);
       }
-    } else if (params.literalInstructionBodies) {
+    }
+    if (params.literalInstructionBodies) {
       for (let i = 0; i < params.literalInstructionBodies.length; i++) {
-        const suffix = params.literalInstructionBodies.length === 1 ? '' : `-${i + 1}`;
+        const suffix = hasSourceInstructions
+          ? `-inline-${i + 1}`
+          : params.literalInstructionBodies.length === 1 ? '' : `-${i + 1}`;
         const targetPath = join(instructionsDir, `${params.safeSkillName}${suffix}.md`);
         writeFileSync(targetPath, normalizeInstructionBody(params.literalInstructionBodies[i] ?? ''), 'utf-8');
         instructionPaths.push(targetPath);

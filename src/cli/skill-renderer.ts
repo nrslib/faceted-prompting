@@ -38,6 +38,25 @@ function resolveFacetRefContent(options: {
   facetDirs: readonly string[];
   allowedRoots: readonly string[];
 }): { body: string; path: string } {
+  const resolved = resolveOptionalFacetRefContent(options);
+  if (resolved) {
+    return resolved;
+  }
+
+  const primaryFacetDir = options.facetDirs[0];
+  if (!primaryFacetDir) {
+    throw new Error(`Missing ${options.label}: facet directory is required`);
+  }
+  throw new Error(`Missing ${options.label}: ${join(primaryFacetDir, `${options.ref}.md`)}`);
+}
+
+function resolveOptionalFacetRefContent(options: {
+  ref: string;
+  label: string;
+  baseDir: string;
+  facetDirs: readonly string[];
+  allowedRoots: readonly string[];
+}): { body: string; path: string } | undefined {
   const { ref, label, baseDir, facetDirs, allowedRoots } = options;
   const primaryFacetDir = facetDirs[0];
   if (!primaryFacetDir) {
@@ -45,8 +64,11 @@ function resolveFacetRefContent(options: {
   }
   if (isResourcePath(ref)) {
     const resourcePath = resolveResourcePath(ref, baseDir);
+    if (!existsSync(resourcePath)) {
+      throw new Error(`Missing ${label}: ${resourcePath}`);
+    }
     const boundedPath = ensurePathWithinRoots(resourcePath, allowedRoots, label);
-    return { path: boundedPath, body: requireFile(boundedPath, label) };
+    return { path: boundedPath, body: readFileSync(boundedPath, 'utf-8') };
   }
 
   for (const facetDir of facetDirs) {
@@ -58,7 +80,7 @@ function resolveFacetRefContent(options: {
     return { path: boundedPath, body: requireFile(boundedPath, label) };
   }
 
-  throw new Error(`Missing ${label}: ${join(primaryFacetDir, `${ref}.md`)}`);
+  return undefined;
 }
 
 function resolveFacetsRoots(params: {
@@ -120,13 +142,16 @@ export function resolveDefinitionSections(params: {
 
   const instructions: InstructionSection[] =
     definition.instructions?.map(ref => {
-      const resolved = resolveFacetRefContent({
+      const resolved = resolveOptionalFacetRefContent({
         ref,
         label: `instruction facet "${ref}"`,
         baseDir: definitionDir,
         facetDirs: facetsRoots.map(facetsRoot => join(facetsRoot, 'instructions')),
         allowedRoots: facetAllowedRoots,
       });
+      if (!resolved) {
+        return { ref: 'literal', body: ref };
+      }
       const expanded = expandInstructionIncludes({
         body: resolved.body,
         partialDirs: facetsRoots.map(facetsRoot => join(facetsRoot, 'instruction-partials')),

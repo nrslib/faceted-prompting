@@ -139,7 +139,7 @@ order:
 
 - `name` and `persona` are required.
 - `order` controls user-message section order (default: `knowledge` -> `instructions` -> `policies`).
-- `instructions` is a list of instruction facet names or Markdown file paths.
+- `instructions` is a list of instruction facet names, Markdown file paths, or inline Markdown text.
 
 Instruction facet files can include shared Markdown partials:
 

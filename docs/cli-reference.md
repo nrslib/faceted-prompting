@@ -116,7 +116,7 @@ knowledge:                   # Optional: knowledge facet names or paths
 policies:                    # Optional: policy facet names or paths
   - coding
   - security
-instructions:                # Optional: instruction facet names or paths
+instructions:                # Optional: instruction facet names, paths, or inline text
   - review-changes
 template: issue-worktree     # Optional: template directory name
 order:                       # Optional: user-message section order
@@ -130,6 +130,7 @@ order:                       # Optional: user-message section order
 - **Facet names** (e.g., `coder`) are resolved from `~/.faceted/facets/{kind}/{name}.md`
 - **File paths** starting with `./`, `../`, `/`, `~` or ending with `.md` are resolved directly
 - **Scope references** (`@owner/repo/name`) are resolved from `~/.faceted/repertoire/`
+- **Inline instructions** are kept as prompt content when an instruction entry is not resolved as a facet name or file path
 
 ### Instruction partial includes
 

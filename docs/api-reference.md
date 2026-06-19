@@ -47,6 +47,8 @@ Pass `facetsRoots` when composition should resolve facets from more than one roo
 
 Instruction partial includes are expanded while resolving compose-definition instructions, before `compose()` receives the resolved `FacetSet`. A token such as `{{include:instructions/review-common}}` resolves to `facets/instruction-partials/review-common.md` under the first matching facets root. A token such as `{{include:instructions/@owner/repo/review-common}}` resolves from repertoire scope packages. Missing partials, empty include names, invalid shortened syntax such as `{{include:review-common}}`, and cyclic include chains throw errors instead of leaving unresolved tokens in the prompt.
 
+Instruction entries that do not resolve as facet names or file paths are treated as inline prompt content. Include tokens inside inline instruction text are not expanded, and inline instruction text is not listed in `copyFiles.instructions`.
+
 ## Types
 
 ### `FacetKind`

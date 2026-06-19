@@ -177,7 +177,7 @@ order:
   - instructions
 ```
 
-The `instructions` field is a list of instruction facet names or paths to Markdown files. Facet names are resolved against the facets directory; file paths (starting with `./`, `../`, `/`, `~`, or ending with `.md`) are resolved directly.
+The `instructions` field is a list of instruction facet names, paths to Markdown files, or inline Markdown text. Facet names are resolved against the facets directory; file paths (starting with `./`, `../`, `/`, `~`, or ending with `.md`) are resolved directly. Instruction entries that are not resolved as facet names or file paths are kept as inline prompt content.
 
 ## Scope References
 

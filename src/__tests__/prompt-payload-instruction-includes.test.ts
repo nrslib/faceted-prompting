@@ -80,13 +80,51 @@ describe('composePromptPayload instruction partial includes', () => {
     expect(payload.copyFiles.instructions).toEqual([realpathSync(instructionPath)]);
   });
 
-  it('should reject inline instruction text instead of treating it as prompt content', () => {
+  it('should keep inline instruction text as prompt content without include expansion', () => {
     const rootDir = createRootDir();
     const facetsRoot = createBasicFacets(rootDir);
+    mkdirSync(join(facetsRoot, 'instruction-partials'), { recursive: true });
+    writeFileSync(
+      join(facetsRoot, 'instruction-partials', 'review-common.md'),
+      'This partial must not be expanded from inline text.',
+      'utf-8',
+    );
+
+    const inlineInstruction = 'Review inline text. {{include:instructions/review-common}}';
+    const plainInlineInstruction = 'Review the README updates.';
+    const payload = createPayload({
+      rootDir,
+      facetsRoot,
+      instructions: [inlineInstruction, plainInlineInstruction],
+    });
+
+    expect(payload.userPrompt).toContain(inlineInstruction);
+    expect(payload.userPrompt).toContain(plainInlineInstruction);
+    expect(payload.userPrompt).not.toContain('This partial must not be expanded from inline text.');
+    expect(payload.copyFiles.instructions).toEqual([]);
+    expect(payload.copyFiles.instructionPartials).toBeUndefined();
+  });
+
+  it('should fail when an instruction entry is a missing file path', () => {
+    const rootDir = createRootDir();
+    const facetsRoot = createBasicFacets(rootDir);
+    const missingInstructionPath = join(facetsRoot, 'instructions', 'missing.md');
 
     expect(() =>
-      createPayload({ rootDir, facetsRoot, instructions: ['Review inline text.'] }),
-    ).toThrow(/Missing instruction facet "Review inline text\."[\s\S]*Review inline text\.\.md/u);
+      createPayload({
+        rootDir,
+        facetsRoot,
+        instructions: [missingInstructionPath],
+      }),
+    ).toThrow(/Missing instruction facet[\s\S]*missing\.md/u);
+
+    expect(() =>
+      createPayload({
+        rootDir,
+        facetsRoot,
+        instructions: ['review.md'],
+      }),
+    ).toThrow(/Missing instruction facet[\s\S]*review\.md/u);
   });
 
   it('should include nested instruction partial paths in copy metadata', () => {
