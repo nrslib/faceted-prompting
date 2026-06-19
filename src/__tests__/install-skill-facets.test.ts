@@ -291,6 +291,86 @@ describe('applyFacetTokens*', () => {
     }
   });
 
+  it('should copy generic facet partials into the matching partials directory', () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-facets-'));
+
+    try {
+      const sourceDir = join(workspaceDir, 'source');
+      const sourcePartialsDir = join(sourceDir, 'facets', 'partials', 'policies');
+      const targetDir = join(workspaceDir, 'target');
+      mkdirSync(sourceDir, { recursive: true });
+      mkdirSync(sourcePartialsDir, { recursive: true });
+      mkdirSync(targetDir, { recursive: true });
+
+      const personaPath = join(sourceDir, 'coder.md');
+      const partialPath = join(sourcePartialsDir, 'coding-common.md');
+      writeFileSync(personaPath, 'Persona Body', 'utf-8');
+      writeFileSync(partialPath, 'Policy Partial Body', 'utf-8');
+
+      const copied = copyFacetFiles({
+        targetDir,
+        safeSkillName: 'policy-skill',
+        copyFiles: {
+          persona: [personaPath],
+          knowledge: [],
+          policies: [],
+          instructions: [],
+          outputContracts: [],
+          facetPartials: [partialPath],
+        },
+      });
+
+      const copiedPartialPath = join(targetDir, 'facets', 'partials', 'policies', 'coding-common.md');
+      expect(copied).toMatchObject({ facetPartials: [copiedPartialPath] });
+      expect(existsSync(copiedPartialPath)).toBe(true);
+      expect(readFileSync(copiedPartialPath, 'utf-8')).toBe('Policy Partial Body');
+      expect(existsSync(join(targetDir, 'facets', 'partials', 'instructions', 'coding-common.md'))).toBe(false);
+    } finally {
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should copy legacy instruction partial metadata into the instruction partials directory', () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-facets-'));
+
+    try {
+      const sourceDir = join(workspaceDir, 'source');
+      const sourcePartialsDir = join(sourceDir, 'facets', 'partials', 'instructions');
+      const targetDir = join(workspaceDir, 'target');
+      mkdirSync(sourceDir, { recursive: true });
+      mkdirSync(sourcePartialsDir, { recursive: true });
+      mkdirSync(targetDir, { recursive: true });
+
+      const personaPath = join(sourceDir, 'coder.md');
+      const partialPath = join(sourcePartialsDir, 'review-common.md');
+      writeFileSync(personaPath, 'Persona Body', 'utf-8');
+      writeFileSync(partialPath, 'Instruction Partial Body', 'utf-8');
+
+      const copied = copyFacetFiles({
+        targetDir,
+        safeSkillName: 'instruction-skill',
+        copyFiles: {
+          persona: [personaPath],
+          knowledge: [],
+          policies: [],
+          instructions: [],
+          outputContracts: [],
+          instructionPartials: [partialPath],
+        },
+      });
+
+      const copiedPartialPath = join(targetDir, 'facets', 'partials', 'instructions', 'review-common.md');
+      expect(copied).toMatchObject({
+        facetPartials: [copiedPartialPath],
+        instructionPartials: [copiedPartialPath],
+      });
+      expect(existsSync(copiedPartialPath)).toBe(true);
+      expect(readFileSync(copiedPartialPath, 'utf-8')).toBe('Instruction Partial Body');
+    } finally {
+      rmSync(workspaceDir, { recursive: true, force: true });
+    }
+  });
+
   it('should build output-contracts token values from skill sections', () => {
     const values = buildInlineFacetTokenValues({
       definition: {

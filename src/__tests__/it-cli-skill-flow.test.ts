@@ -407,6 +407,178 @@ describe('facet skill integration flow', () => {
     expect(recomposed.userPrompt).not.toContain('{{include:instructions/@acme/review-pack/review-common}}');
   });
 
+  it('should install non-instruction partials so copied facets can be recomposed', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    const { compositionsRoot } = createFacetedFixture(homeDir);
+
+    const facetsRoot = join(homeDir, '.faceted', 'facets');
+    mkdirSync(join(facetsRoot, 'partials/policies'), { recursive: true });
+    writeFileSync(
+      join(compositionsRoot, 'coding.yaml'),
+      [
+        'name: coding',
+        'description: Coding workflow',
+        'persona: coder',
+        'policies:',
+        '  - coding',
+        'knowledge:',
+        '  - architecture',
+        'instructions:',
+        '  - keep-changes-small',
+      ].join('\n'),
+      'utf-8',
+    );
+    writeFileSync(
+      join(facetsRoot, 'policies', 'coding.md'),
+      [
+        'Never hide errors.',
+        '{{include:policies/coding-common}}',
+        'Keep policy rules explicit.',
+      ].join('\n'),
+      'utf-8',
+    );
+    writeFileSync(
+      join(facetsRoot, 'partials/policies', 'coding-common.md'),
+      'Preserve the original task requirements in reviews.',
+      'utf-8',
+    );
+
+    const skillOutputPath = join(homeDir, '.claude', 'skills', 'coding', 'SKILL.md');
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli(['install', 'skill'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['coding (global)', 'Claude Code']),
+      input: async (prompt, defaultValue) =>
+        prompt.toLowerCase().includes('output') ? skillOutputPath : defaultValue,
+    });
+
+    const skillDir = dirname(skillOutputPath);
+    const copiedFacetsRoot = join(skillDir, 'facets');
+    const copiedPolicyPartialPath = join(copiedFacetsRoot, 'partials/policies', 'coding-common.md');
+    expect(result).toEqual({ kind: 'path', path: skillOutputPath });
+    expect(readFileSync(skillOutputPath, 'utf-8')).toContain(
+      'Preserve the original task requirements in reviews.',
+    );
+    expect(existsSync(copiedPolicyPartialPath)).toBe(true);
+    expect(existsSync(join(copiedFacetsRoot, 'partials/instructions', 'coding-common.md'))).toBe(false);
+
+    const recomposed = composePromptPayload({
+      definition: {
+        name: 'coding',
+        persona: 'coder',
+        policies: ['coding'],
+        knowledge: ['architecture'],
+        instructions: ['keep-changes-small'],
+      },
+      definitionDir: skillDir,
+      facetsRoot: copiedFacetsRoot,
+      composeOptions: {
+        contextMaxChars: 8000,
+      },
+    });
+
+    expect(recomposed.userPrompt).toContain('Preserve the original task requirements in reviews.');
+    expect(recomposed.userPrompt).not.toContain('{{include:policies/coding-common}}');
+  });
+
+  it('should install scoped non-instruction partials so copied facets can be recomposed', async () => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+    const { compositionsRoot } = createFacetedFixture(homeDir);
+
+    const facetsRoot = join(homeDir, '.faceted', 'facets');
+    const repertoirePartialPath = join(
+      homeDir,
+      '.faceted',
+      'repertoire',
+      '@acme',
+      'policy-pack',
+      'facets',
+      'partials/policies',
+      'coding-common.md',
+    );
+    mkdirSync(dirname(repertoirePartialPath), { recursive: true });
+    writeFileSync(
+      join(compositionsRoot, 'coding.yaml'),
+      [
+        'name: coding',
+        'description: Coding workflow',
+        'persona: coder',
+        'policies:',
+        '  - coding',
+        'knowledge:',
+        '  - architecture',
+        'instructions:',
+        '  - keep-changes-small',
+      ].join('\n'),
+      'utf-8',
+    );
+    writeFileSync(
+      join(facetsRoot, 'policies', 'coding.md'),
+      [
+        'Never hide errors.',
+        '{{include:policies/@acme/policy-pack/coding-common}}',
+        'Keep policy rules explicit.',
+      ].join('\n'),
+      'utf-8',
+    );
+    writeFileSync(
+      repertoirePartialPath,
+      'Preserve scoped policy evidence in copied skills.',
+      'utf-8',
+    );
+
+    const skillOutputPath = join(homeDir, '.claude', 'skills', 'coding', 'SKILL.md');
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli(['install', 'skill'], {
+      cwd: workspaceDir,
+      homeDir,
+      select: createSelectStub(['coding (global)', 'Claude Code']),
+      input: async (prompt, defaultValue) =>
+        prompt.toLowerCase().includes('output') ? skillOutputPath : defaultValue,
+    });
+
+    const skillDir = dirname(skillOutputPath);
+    const copiedFacetsRoot = join(skillDir, 'facets');
+    const copiedScopedPartialPath = join(
+      skillDir,
+      'repertoire',
+      '@acme',
+      'policy-pack',
+      'facets',
+      'partials/policies',
+      'coding-common.md',
+    );
+    expect(result).toEqual({ kind: 'path', path: skillOutputPath });
+    expect(readFileSync(skillOutputPath, 'utf-8')).toContain(
+      'Preserve scoped policy evidence in copied skills.',
+    );
+    expect(existsSync(copiedScopedPartialPath)).toBe(true);
+    expect(existsSync(join(copiedFacetsRoot, 'partials/policies', 'coding-common.md'))).toBe(false);
+
+    const recomposed = composePromptPayload({
+      definition: {
+        name: 'coding',
+        persona: 'coder',
+        policies: ['coding'],
+        knowledge: ['architecture'],
+        instructions: ['keep-changes-small'],
+      },
+      definitionDir: skillDir,
+      facetsRoot: copiedFacetsRoot,
+      composeOptions: {
+        contextMaxChars: 8000,
+      },
+    });
+
+    expect(recomposed.userPrompt).toContain('Preserve scoped policy evidence in copied skills.');
+    expect(recomposed.userPrompt).not.toContain('{{include:policies/@acme/policy-pack/coding-common}}');
+  });
+
   it('should install template-backed skill with expanded instruction partials', async () => {
     const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
     const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));

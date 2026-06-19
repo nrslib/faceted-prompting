@@ -1,8 +1,48 @@
-import { mkdtempSync, mkdirSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { composePromptPayload } from '../prompt-payload.js';
+
+type FacetIncludeCase = {
+  readonly definitionKey: 'policies' | 'knowledge' | 'outputContracts';
+  readonly facetDir: 'policies' | 'knowledge' | 'output-contracts';
+  readonly includeKind: 'policies' | 'knowledge' | 'output-contracts';
+  readonly ref: string;
+  readonly bodyBefore: string;
+  readonly partialBody: string;
+  readonly bodyAfter: string;
+};
+
+const facetIncludeCases: readonly FacetIncludeCase[] = [
+  {
+    definitionKey: 'policies',
+    facetDir: 'policies',
+    includeKind: 'policies',
+    ref: 'coding',
+    bodyBefore: 'Policy before.',
+    partialBody: 'Shared policy rule.',
+    bodyAfter: 'Policy after.',
+  },
+  {
+    definitionKey: 'knowledge',
+    facetDir: 'knowledge',
+    includeKind: 'knowledge',
+    ref: 'architecture',
+    bodyBefore: 'Knowledge before.',
+    partialBody: 'Shared architecture context.',
+    bodyAfter: 'Knowledge after.',
+  },
+  {
+    definitionKey: 'outputContracts',
+    facetDir: 'output-contracts',
+    includeKind: 'output-contracts',
+    ref: 'test-report',
+    bodyBefore: 'Contract before.',
+    partialBody: 'Shared report section.',
+    bodyAfter: 'Contract after.',
+  },
+];
 
 describe('composePromptPayload instruction partial includes', () => {
   const tempDirs: string[] = [];
@@ -46,6 +86,25 @@ describe('composePromptPayload instruction partial includes', () => {
     });
   }
 
+  function createPayloadForFacetCase(params: {
+    rootDir: string;
+    facetsRoot: string;
+    facetCase: FacetIncludeCase;
+  }) {
+    return composePromptPayload({
+      definition: {
+        name: 'coding',
+        persona: 'coder',
+        [params.facetCase.definitionKey]: [params.facetCase.ref],
+      },
+      definitionDir: params.rootDir,
+      facetsRoot: params.facetsRoot,
+      composeOptions: {
+        contextMaxChars: 8000,
+      },
+    });
+  }
+
   it('should expand instruction partial includes at the include site and preserve source metadata', () => {
     const rootDir = createRootDir();
     const facetsRoot = createBasicFacets(rootDir);
@@ -77,6 +136,7 @@ describe('composePromptPayload instruction partial includes', () => {
     ].join('\n'));
     expect(payload.userPrompt).not.toContain('{{include:instructions/review-common}}');
     expect(payload.copyFiles.instructionPartials).toEqual([realpathSync(partialPath)]);
+    expect(payload.copyFiles).toMatchObject({ facetPartials: [realpathSync(partialPath)] });
     expect(payload.copyFiles.instructions).toEqual([realpathSync(instructionPath)]);
   });
 
@@ -103,6 +163,71 @@ describe('composePromptPayload instruction partial includes', () => {
     expect(payload.userPrompt).not.toContain('This partial must not be expanded from inline text.');
     expect(payload.copyFiles.instructions).toEqual([]);
     expect(payload.copyFiles.instructionPartials).toBeUndefined();
+  });
+
+  it('should keep persona facet include tokens unexpanded', () => {
+    const rootDir = createRootDir();
+    const facetsRoot = createBasicFacets(rootDir);
+    mkdirSync(join(facetsRoot, 'partials/instructions'), { recursive: true });
+    writeFileSync(
+      join(facetsRoot, 'persona', 'coder.md'),
+      'You are a coding agent. {{include:instructions/persona-shared}}',
+      'utf-8',
+    );
+    writeFileSync(
+      join(facetsRoot, 'partials/instructions', 'persona-shared.md'),
+      'This partial must not be expanded from persona text.',
+      'utf-8',
+    );
+
+    const payload = composePromptPayload({
+      definition: {
+        name: 'coding',
+        persona: 'coder',
+      },
+      definitionDir: rootDir,
+      facetsRoot,
+      composeOptions: {
+        contextMaxChars: 8000,
+      },
+    });
+
+    expect(payload.systemPrompt).toContain('{{include:instructions/persona-shared}}');
+    expect(payload.systemPrompt).not.toContain('This partial must not be expanded from persona text.');
+    expect(payload.copyFiles.facetPartials).toBeUndefined();
+    expect(payload.copyFiles.instructionPartials).toBeUndefined();
+  });
+
+  it('should reject persona partial includes from file-backed facets', () => {
+    const rootDir = createRootDir();
+    const facetsRoot = createBasicFacets(rootDir);
+    mkdirSync(join(facetsRoot, 'policies'), { recursive: true });
+    mkdirSync(join(facetsRoot, 'partials/personas'), { recursive: true });
+    writeFileSync(
+      join(facetsRoot, 'policies', 'coding.md'),
+      'Policy.\n{{include:personas/coder-shared}}',
+      'utf-8',
+    );
+    writeFileSync(
+      join(facetsRoot, 'partials/personas', 'coder-shared.md'),
+      'Persona partials are not supported.',
+      'utf-8',
+    );
+
+    expect(() =>
+      composePromptPayload({
+        definition: {
+          name: 'coding',
+          persona: 'coder',
+          policies: ['coding'],
+        },
+        definitionDir: rootDir,
+        facetsRoot,
+        composeOptions: {
+          contextMaxChars: 8000,
+        },
+      }),
+    ).toThrow(/Invalid [\s\S]*include "personas\/coder-shared"[\s\S]*\{\{include:[^}]+\/<name>\}\}/u);
   });
 
   it('should fail when an instruction entry is a missing file path', () => {
@@ -152,6 +277,12 @@ describe('composePromptPayload instruction partial includes', () => {
       realpathSync(commonPath),
       realpathSync(evidencePath),
     ]);
+    expect(payload.copyFiles).toMatchObject({
+      facetPartials: [
+        realpathSync(commonPath),
+        realpathSync(evidencePath),
+      ],
+    });
   });
 
   it('should prefer local instruction partials over global instruction partials', () => {
@@ -236,6 +367,7 @@ describe('composePromptPayload instruction partial includes', () => {
 
     expect(payload.userPrompt).toContain('Shared repertoire review procedure.');
     expect(payload.copyFiles.instructionPartials).toEqual([realpathSync(partialPath)]);
+    expect(payload.copyFiles).toMatchObject({ facetPartials: [realpathSync(partialPath)] });
   });
 
   it('should not allow repertoire roots for regular facet file references', () => {
@@ -314,7 +446,7 @@ describe('composePromptPayload instruction partial includes', () => {
 
     expect(() =>
       createPayload({ rootDir, facetsRoot, instructions: ['review-coding'] }),
-    ).toThrow(/Missing instruction include[\s\S]*@acme\/review-pack\/missing-common/u);
+    ).toThrow(/Missing [\s\S]*include[\s\S]*@acme\/review-pack\/missing-common/u);
   });
 
   it('should fail when an unscoped instruction partial include is missing from all roots', () => {
@@ -343,7 +475,7 @@ describe('composePromptPayload instruction partial includes', () => {
           contextMaxChars: 8000,
         },
       }),
-    ).toThrow(/Missing instruction include[\s\S]*local[\s\S]*missing-common\.md[\s\S]*global[\s\S]*missing-common\.md/u);
+    ).toThrow(/Missing [\s\S]*include[\s\S]*local[\s\S]*missing-common\.md[\s\S]*global[\s\S]*missing-common\.md/u);
   });
 
   it('should fail when an instruction partial include name is empty', () => {
@@ -353,10 +485,10 @@ describe('composePromptPayload instruction partial includes', () => {
     writeFileSync(join(facetsRoot, 'instructions', 'blank.md'), 'Before {{include: }} After', 'utf-8');
 
     expect(() => createPayload({ rootDir, facetsRoot, instructions: ['empty'] })).toThrow(
-      /Invalid instruction include[\s\S]*missing include name/u,
+      /Invalid [\s\S]*include[\s\S]*missing include name/u,
     );
     expect(() => createPayload({ rootDir, facetsRoot, instructions: ['blank'] })).toThrow(
-      /Invalid instruction include[\s\S]*missing include name/u,
+      /Invalid [\s\S]*include[\s\S]*missing include name/u,
     );
   });
 
@@ -367,7 +499,7 @@ describe('composePromptPayload instruction partial includes', () => {
 
     expect(() =>
       createPayload({ rootDir, facetsRoot, instructions: ['review-coding'] }),
-    ).toThrow(/Invalid instruction include "review-common"[\s\S]*\{\{include:instructions\/<name>\}\}/u);
+    ).toThrow(/Invalid [\s\S]*include "review-common"[\s\S]*\{\{include:[^}]+\/<name>\}\}/u);
   });
 
   it('should fail with the include chain when instruction partial includes are cyclic', () => {
@@ -381,32 +513,250 @@ describe('composePromptPayload instruction partial includes', () => {
 
     expect(() =>
       createPayload({ rootDir, facetsRoot, instructions: ['review-coding'] }),
-    ).toThrow(/Cyclic instruction include[\s\S]*instructions\/first[\s\S]*instructions\/second[\s\S]*instructions\/first/u);
+    ).toThrow(/Cyclic [\s\S]*include[\s\S]*instructions\/first[\s\S]*instructions\/second[\s\S]*instructions\/first/u);
   });
 
-  it('should leave include syntax in non-instruction facets unchanged', () => {
+  for (const facetCase of facetIncludeCases) {
+    it(`should expand ${facetCase.includeKind} partial includes and preserve generic source metadata`, () => {
+      const rootDir = createRootDir();
+      const facetsRoot = createBasicFacets(rootDir);
+      mkdirSync(join(facetsRoot, facetCase.facetDir), { recursive: true });
+      mkdirSync(join(facetsRoot, 'partials', facetCase.includeKind), { recursive: true });
+
+      const facetPath = join(facetsRoot, facetCase.facetDir, `${facetCase.ref}.md`);
+      const partialPath = join(facetsRoot, 'partials', facetCase.includeKind, 'shared.md');
+      writeFileSync(
+        facetPath,
+        [
+          facetCase.bodyBefore,
+          `{{include:${facetCase.includeKind}/shared}}`,
+          facetCase.bodyAfter,
+        ].join('\n'),
+        'utf-8',
+      );
+      writeFileSync(partialPath, facetCase.partialBody, 'utf-8');
+
+      const payload = createPayloadForFacetCase({ rootDir, facetsRoot, facetCase });
+
+      expect(payload.userPrompt).toContain(
+        [facetCase.bodyBefore, facetCase.partialBody, facetCase.bodyAfter].join('\n'),
+      );
+      expect(payload.userPrompt).not.toContain(`{{include:${facetCase.includeKind}/shared}}`);
+      expect(payload.copyFiles).toMatchObject({ facetPartials: [realpathSync(partialPath)] });
+      expect(payload.copyFiles.instructionPartials).toBeUndefined();
+    });
+  }
+
+  for (const facetCase of facetIncludeCases) {
+    it(`should expand nested partial includes for ${facetCase.includeKind}`, () => {
+      const rootDir = createRootDir();
+      const facetsRoot = createBasicFacets(rootDir);
+      mkdirSync(join(facetsRoot, facetCase.facetDir), { recursive: true });
+      mkdirSync(join(facetsRoot, 'partials', facetCase.includeKind), { recursive: true });
+
+      const facetPath = join(facetsRoot, facetCase.facetDir, `${facetCase.ref}.md`);
+      const commonPath = join(facetsRoot, 'partials', facetCase.includeKind, 'common.md');
+      const evidencePath = join(facetsRoot, 'partials', facetCase.includeKind, 'evidence.md');
+      writeFileSync(
+        facetPath,
+        `Before\n{{include:${facetCase.includeKind}/common}}\nAfter`,
+        'utf-8',
+      );
+      writeFileSync(
+        commonPath,
+        `Common start\n{{include:${facetCase.includeKind}/evidence}}\nCommon end`,
+        'utf-8',
+      );
+      writeFileSync(evidencePath, `${facetCase.includeKind} evidence.`, 'utf-8');
+
+      const payload = createPayloadForFacetCase({ rootDir, facetsRoot, facetCase });
+
+      expect(payload.userPrompt).toContain([
+        'Before',
+        'Common start',
+        `${facetCase.includeKind} evidence.`,
+        'Common end',
+        'After',
+      ].join('\n'));
+      expect(payload.copyFiles).toMatchObject({
+        facetPartials: [
+          realpathSync(commonPath),
+          realpathSync(evidencePath),
+        ],
+      });
+    });
+  }
+
+  for (const facetCase of facetIncludeCases) {
+    it(`should resolve scoped partial includes for ${facetCase.includeKind}`, () => {
+      const rootDir = createRootDir();
+      const facetedRoot = join(rootDir, '.faceted');
+      const facetsRoot = createBasicFacets(facetedRoot);
+      const packageName = `${facetCase.includeKind}-pack`;
+      const partialPath = join(
+        facetedRoot,
+        'repertoire',
+        '@acme',
+        packageName,
+        'facets',
+        'partials',
+        facetCase.includeKind,
+        'shared.md',
+      );
+      mkdirSync(join(facetsRoot, facetCase.facetDir), { recursive: true });
+      mkdirSync(dirname(partialPath), { recursive: true });
+      writeFileSync(
+        join(facetsRoot, facetCase.facetDir, `${facetCase.ref}.md`),
+        `Facet.\n{{include:${facetCase.includeKind}/@acme/${packageName}/shared}}`,
+        'utf-8',
+      );
+      writeFileSync(partialPath, `Scoped ${facetCase.includeKind} partial.`, 'utf-8');
+
+      const payload = createPayloadForFacetCase({ rootDir, facetsRoot, facetCase });
+
+      expect(payload.userPrompt).toContain(`Scoped ${facetCase.includeKind} partial.`);
+      expect(payload.copyFiles).toMatchObject({ facetPartials: [realpathSync(partialPath)] });
+    });
+  }
+
+  for (const facetCase of facetIncludeCases) {
+    it(`should fail when an unscoped ${facetCase.includeKind} partial include is missing`, () => {
+      const rootDir = createRootDir();
+      const facetsRoot = createBasicFacets(rootDir);
+      mkdirSync(join(facetsRoot, facetCase.facetDir), { recursive: true });
+      writeFileSync(
+        join(facetsRoot, facetCase.facetDir, `${facetCase.ref}.md`),
+        `Facet.\n{{include:${facetCase.includeKind}/missing-common}}`,
+        'utf-8',
+      );
+
+      expect(() =>
+        createPayloadForFacetCase({ rootDir, facetsRoot, facetCase }),
+      ).toThrow(new RegExp(`Missing [\\s\\S]*include[\\s\\S]*${facetCase.includeKind}/missing-common`, 'u'));
+    });
+  }
+
+  it('should reject non-instruction partial includes when the partial path is a symbolic link', () => {
     const rootDir = createRootDir();
     const facetsRoot = createBasicFacets(rootDir);
     mkdirSync(join(facetsRoot, 'policies'), { recursive: true });
+    mkdirSync(join(facetsRoot, 'partials/policies'), { recursive: true });
 
-    writeFileSync(join(facetsRoot, 'policies', 'coding.md'), 'Policy {{include:instructions/common}}.', 'utf-8');
-    writeFileSync(join(facetsRoot, 'instructions', 'do-the-work.md'), 'Do the work.', 'utf-8');
+    const outsidePartialPath = join(rootDir, 'outside-policy.md');
+    const symlinkPartialPath = join(facetsRoot, 'partials/policies', 'shared.md');
+    writeFileSync(join(facetsRoot, 'policies', 'coding.md'), 'Policy.\n{{include:policies/shared}}', 'utf-8');
+    writeFileSync(outsidePartialPath, 'Escaped policy partial.', 'utf-8');
+    symlinkSync(outsidePartialPath, symlinkPartialPath);
 
-    const payload = composePromptPayload({
-      definition: {
-        name: 'coding',
-        persona: 'coder',
-        policies: ['coding'],
-        instructions: ['do-the-work'],
-      },
-      definitionDir: rootDir,
-      facetsRoot,
-      composeOptions: {
-        contextMaxChars: 8000,
-      },
-    });
-
-    expect(payload.userPrompt).toContain('Policy {{include:instructions/common}}.');
-    expect(payload.userPrompt).toContain('Do the work.');
+    expect(() =>
+      composePromptPayload({
+        definition: {
+          name: 'coding',
+          persona: 'coder',
+          policies: ['coding'],
+        },
+        definitionDir: rootDir,
+        facetsRoot,
+        composeOptions: {
+          contextMaxChars: 8000,
+        },
+      }),
+    ).toThrow(/Symbolic links are not allowed for facet include "policies\/shared"/u);
   });
+
+  it('should reject local partial includes when the partial path is a directory', () => {
+    const rootDir = createRootDir();
+    const facetsRoot = createBasicFacets(rootDir);
+    mkdirSync(join(facetsRoot, 'policies'), { recursive: true });
+    mkdirSync(join(facetsRoot, 'partials/policies', 'shared.md'), { recursive: true });
+    writeFileSync(join(facetsRoot, 'policies', 'coding.md'), 'Policy.\n{{include:policies/shared}}', 'utf-8');
+
+    expect(() =>
+      composePromptPayload({
+        definition: {
+          name: 'coding',
+          persona: 'coder',
+          policies: ['coding'],
+        },
+        definitionDir: rootDir,
+        facetsRoot,
+        composeOptions: {
+          contextMaxChars: 8000,
+        },
+      }),
+    ).toThrow(/Facet include "policies\/shared" must resolve to a file/u);
+  });
+
+  it('should reject scoped partial includes when the partial path is a directory', () => {
+    const rootDir = createRootDir();
+    const facetedRoot = join(rootDir, '.faceted');
+    const facetsRoot = join(facetedRoot, 'facets');
+    const partialPath = join(
+      facetedRoot,
+      'repertoire',
+      '@acme',
+      'policy-pack',
+      'facets',
+      'partials/policies',
+      'coding-common.md',
+    );
+    mkdirSync(join(facetsRoot, 'persona'), { recursive: true });
+    mkdirSync(join(facetsRoot, 'policies'), { recursive: true });
+    mkdirSync(partialPath, { recursive: true });
+    writeFileSync(join(facetsRoot, 'persona', 'coder.md'), 'You are a coding agent.', 'utf-8');
+    writeFileSync(
+      join(facetsRoot, 'policies', 'coding.md'),
+      'Policy.\n{{include:policies/@acme/policy-pack/coding-common}}',
+      'utf-8',
+    );
+
+    expect(() =>
+      composePromptPayload({
+        definition: {
+          name: 'coding',
+          persona: 'coder',
+          policies: ['coding'],
+        },
+        definitionDir: rootDir,
+        facetsRoot,
+        composeOptions: {
+          contextMaxChars: 8000,
+        },
+      }),
+    ).toThrow(/Facet include "policies\/@acme\/policy-pack\/coding-common" must resolve to a file/u);
+  });
+
+  for (const facetCase of facetIncludeCases) {
+    it(`should fail with the include chain when ${facetCase.includeKind} partial includes are cyclic`, () => {
+      const rootDir = createRootDir();
+      const facetsRoot = createBasicFacets(rootDir);
+      mkdirSync(join(facetsRoot, facetCase.facetDir), { recursive: true });
+      mkdirSync(join(facetsRoot, 'partials', facetCase.includeKind), { recursive: true });
+
+      writeFileSync(
+        join(facetsRoot, facetCase.facetDir, `${facetCase.ref}.md`),
+        `{{include:${facetCase.includeKind}/first}}`,
+        'utf-8',
+      );
+      writeFileSync(
+        join(facetsRoot, 'partials', facetCase.includeKind, 'first.md'),
+        `{{include:${facetCase.includeKind}/second}}`,
+        'utf-8',
+      );
+      writeFileSync(
+        join(facetsRoot, 'partials', facetCase.includeKind, 'second.md'),
+        `{{include:${facetCase.includeKind}/first}}`,
+        'utf-8',
+      );
+
+      expect(() =>
+        createPayloadForFacetCase({ rootDir, facetsRoot, facetCase }),
+      ).toThrow(
+        new RegExp(
+          `Cyclic [\\s\\S]*include[\\s\\S]*${facetCase.includeKind}/first[\\s\\S]*${facetCase.includeKind}/second[\\s\\S]*${facetCase.includeKind}/first`,
+          'u',
+        ),
+      );
+    });
+  }
 });

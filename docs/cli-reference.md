@@ -140,14 +140,14 @@ order:                       # Optional: user-message section order
 
 If `order` is omitted, the user-message section order is `knowledge`, `instructions`, `output-contracts`, then `policies`. The YAML key is `output-contracts`; the TypeScript API exposes it as `outputContracts`.
 
-### Instruction partial includes
+### Facet Partial Includes
 
-Instruction facet files may include shared Markdown partials with this syntax:
+File-backed instruction, policy, knowledge, and output-contract facet files may include shared Markdown partials with this syntax:
 
 ```md
 {{include:instructions/review-common}}
 ```
 
-`{{include:instructions/review-common}}` resolves to `facets/partials/instructions/review-common.md` and expands in place before the composed prompt is written. Repertoire partials use `{{include:instructions/@owner/repo/<name>}}` and resolve from `repertoire/@owner/repo/facets/partials/instructions/<name>.md`. The feature is instruction-only; other facet kinds are not expanded. Shortened forms such as `{{include:review-common}}` are rejected.
+`{{include:instructions/review-common}}` resolves to `facets/partials/instructions/review-common.md` and expands in place before the composed prompt is written. Supported include kinds are `instructions`, `policies`, `knowledge`, and `output-contracts`. Repertoire partials use `{{include:<kind>/@owner/repo/<name>}}` and resolve from `repertoire/@owner/repo/facets/partials/<kind>/<name>.md`. Shortened forms such as `{{include:review-common}}` are rejected.
 
-When both local and global faceted roots are available, partials follow local-first resolution: `.faceted/facets/partials/instructions/` is checked before `~/.faceted/facets/partials/instructions/`. Missing includes and cyclic include chains stop the command with an explicit error. The partial source paths are included in `composePromptPayload().copyFiles.instructionPartials` only when includes are used, so install and copy metadata can keep them separate from standalone instruction facets.
+When both local and global faceted roots are available, partials follow local-first resolution: `.faceted/facets/partials/<kind>/` is checked before `~/.faceted/facets/partials/<kind>/`. Missing includes, empty include names, shortened syntax, cyclic include chains, paths that escape the allowed roots, and partial paths that resolve to directories or other non-file targets stop the command with an explicit error. Inline instruction text does not expand include tokens. The partial source paths are included in `composePromptPayload().copyFiles.facetPartials` only when includes are used; `copyFiles.instructionPartials` remains available for instruction partial compatibility.

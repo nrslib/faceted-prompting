@@ -149,9 +149,9 @@ facets/
 
 The `FileDataEngine` resolves facets from this structure using the convention `{root}/{kind}/{key}.md`. The `CompositeDataEngine` layers multiple directories with first-match-wins resolution, enabling project-level facets to override global defaults.
 
-## Instruction Partials
+## Facet Partials
 
-Instruction facets can include reusable Markdown partials for shared task procedure text:
+File-backed instruction, policy, knowledge, and output-contract facets can include reusable Markdown partials for shared text:
 
 ```markdown
 # instructions/review.md
@@ -160,17 +160,21 @@ Review the change for mergeable quality.
 {{include:instructions/review-common}}
 ```
 
-The include resolves to `facets/partials/instructions/review-common.md` and expands at the include site before the final user message is composed. Instruction partials are shared fragments for instruction facets, not standalone instruction facets resolved by name.
+The include resolves to `facets/partials/instructions/review-common.md` and expands at the include site before the final user message is composed. Facet partials are shared fragments for file-backed facets, not standalone facets resolved by name.
 
-Partial includes are intentionally narrow:
+Partial includes are intentionally bounded:
 
-- Only instruction facets expand include tokens.
-- The supported syntax is `{{include:instructions/<name>}}` or `{{include:instructions/@owner/repo/<name>}}`.
+- Only `instructions`, `policies`, `knowledge`, and `output-contracts` facets expand include tokens.
+- The supported syntax is `{{include:<kind>/<name>}}` or `{{include:<kind>/@owner/repo/<name>}}`.
 - Shortened syntax such as `{{include:<name>}}` is invalid.
+- Empty include names are invalid.
 - Missing partials fail with an explicit error.
 - Cyclic include chains fail with an error that includes the chain.
+- Partial paths that escape the allowed roots fail with an explicit error.
+- Partial paths that resolve to directories or other non-file targets fail with an explicit error.
+- Inline instruction text does not expand include tokens.
 
-When local and global faceted roots are both present, instruction partials use the same first-match rule as facets: local `.faceted/facets/partials/instructions/` overrides global `~/.faceted/facets/partials/instructions/`. `composePromptPayload()` records instruction facet source paths in `copyFiles.instructions` and records included partial source paths in `copyFiles.instructionPartials` only when includes are used.
+When local and global faceted roots are both present, facet partials use the same first-match rule as facets: local `.faceted/facets/partials/<kind>/` overrides global `~/.faceted/facets/partials/<kind>/`. Scoped partials resolve from `repertoire/@owner/repo/facets/partials/<kind>/<name>.md`. `composePromptPayload()` records included partial source paths in `copyFiles.facetPartials` only when includes are used, and keeps `copyFiles.instructionPartials` for compatibility with existing instruction partial consumers.
 
 ## Compose Definitions
 
