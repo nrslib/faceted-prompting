@@ -1,4 +1,4 @@
-import { basename, dirname, join } from 'node:path';
+import { basename, join } from 'node:path';
 import { copyFileSync, mkdirSync, readdirSync, realpathSync, writeFileSync } from 'node:fs';
 import type { buildSkillSections } from '../skill-renderer.js';
 import type { CopyFiles } from '../../types.js';
@@ -10,17 +10,16 @@ import {
 } from './facet-token-file-ops.js';
 import { hasFacetToken, replaceFacetTokens } from './facet-token-renderer.js';
 import type { FacetTokenValues } from './facet-token-renderer.js';
-import { instructionPartialTargetPath } from './instruction-partial-copy.js';
-import { instructionPartialsDir } from '../../instruction-partial-paths.js';
+import { copyFacetPartials } from './facet-partial-copy.js';
 
 export type SkillSections = ReturnType<typeof buildSkillSections>;
-
 export interface FacetPathMap {
   readonly persona: string;
   readonly knowledges: readonly string[];
   readonly policies: readonly string[];
   readonly instructions: readonly string[];
   readonly outputContracts: readonly string[];
+  readonly facetPartials: readonly string[];
   readonly instructionPartials: readonly string[];
 }
 
@@ -158,7 +157,6 @@ export function copyFacetFiles(params: {
   const knowledgeDir = join(facetsDir, 'knowledge');
   const policiesDir = join(facetsDir, 'policies');
   const instructionsDir = join(facetsDir, 'instructions');
-  const partialsDir = instructionPartialsDir(facetsDir);
   const outputContractsDir = join(facetsDir, 'output-contracts');
 
   mkdirSync(personaDir, { recursive: true });
@@ -185,15 +183,10 @@ export function copyFacetFiles(params: {
     return targetPath;
   });
 
-  const instructionPartialPaths = (params.copyFiles.instructionPartials ?? []).map(path => {
-    const targetPath = instructionPartialTargetPath({
-      sourcePath: path,
-      targetDir: params.targetDir,
-      instructionPartialsDir: partialsDir,
-    });
-    mkdirSync(dirname(targetPath), { recursive: true });
-    copyFileSync(path, targetPath);
-    return targetPath;
+  const { facetPartialPaths, instructionPartialPaths } = copyFacetPartials({
+    targetDir: params.targetDir,
+    facetPartials: params.copyFiles.facetPartials,
+    instructionPartials: params.copyFiles.instructionPartials,
   });
 
   const outputContractPaths = params.copyFiles.outputContracts.map(path => {
@@ -233,6 +226,7 @@ export function copyFacetFiles(params: {
     policies: policyPaths,
     instructions: instructionPaths,
     outputContracts: outputContractPaths,
+    facetPartials: facetPartialPaths,
     instructionPartials: instructionPartialPaths,
   };
 }

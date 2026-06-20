@@ -11,6 +11,7 @@ export interface SkillSection {
   readonly ref: string;
   readonly body: string;
   readonly path: string;
+  readonly sourcePaths?: readonly string[];
 }
 
 export interface FileInstructionSection extends SkillSection {

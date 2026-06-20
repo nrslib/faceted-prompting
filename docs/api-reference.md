@@ -52,11 +52,11 @@ function composePromptPayload(params: {
 - `params.composeOptions` — Composition options passed to `compose`
 
 At least one facet root is required through `facetsRoot` or a non-empty `facetsRoots`.
-Regular facet scope references require `facetedRoots`; calling this API with a scope reference and no repertoire roots fails with an error instead of falling back to a local facet name. Instruction partial includes can also resolve copied repertoire partials inferred from the parent directories of the configured facets roots.
+Regular facet scope references require `facetedRoots`; calling this API with a scope reference and no repertoire roots fails with an error instead of falling back to a local facet name. Facet partial includes can also resolve copied repertoire partials inferred from the parent directories of the configured facets roots.
 
-**Returns:** `ComposedPromptPayload` with `systemPrompt`, `userPrompt`, and `copyFiles` (file paths used for each facet kind). `copyFiles.outputContracts` includes output-contract facet paths. `copyFiles.instructions` includes instruction facet paths, and `copyFiles.instructionPartials` is present only when instruction partial paths are expanded from `{{include:instructions/<name>}}` or `{{include:instructions/@owner/repo/<name>}}`.
+**Returns:** `ComposedPromptPayload` with `systemPrompt`, `userPrompt`, and `copyFiles` (file paths used for each facet kind). `copyFiles.outputContracts` includes output-contract facet paths. `copyFiles.instructions` includes instruction facet paths. `copyFiles.facetPartials` is present only when partial paths are expanded from `{{include:<kind>/<name>}}` or `{{include:<kind>/@owner/repo/<name>}}`; `copyFiles.instructionPartials` is retained for compatibility with existing instruction partial consumers.
 
-Instruction partial includes are expanded while resolving compose-definition instructions, before `compose()` receives the resolved `FacetSet`. A token such as `{{include:instructions/review-common}}` resolves to `facets/partials/instructions/review-common.md` under the first matching facets root. A token such as `{{include:instructions/@owner/repo/review-common}}` resolves from `repertoire/@owner/repo/facets/partials/instructions/review-common.md`. Missing partials, empty include names, invalid shortened syntax such as `{{include:review-common}}`, and cyclic include chains throw errors instead of leaving unresolved tokens in the prompt.
+Facet partial includes are expanded while resolving file-backed compose-definition `instructions`, `policies`, `knowledge`, and `output-contracts`, before `compose()` receives the resolved `FacetSet`. A token such as `{{include:policies/review-common}}` resolves to `facets/partials/policies/review-common.md` under the first matching facets root. A token such as `{{include:policies/@owner/repo/review-common}}` resolves from `repertoire/@owner/repo/facets/partials/policies/review-common.md`. Missing partials, empty include names, invalid shortened syntax such as `{{include:review-common}}`, cyclic include chains, paths that escape the allowed roots, and partial paths that resolve to directories or other non-file targets throw errors instead of leaving unresolved tokens in the prompt.
 
 Instruction entries that do not resolve as facet names, file paths, or scope references are treated as inline prompt content. Include tokens inside inline instruction text are not expanded, and inline instruction text is not listed in `copyFiles.instructions`.
 
@@ -117,6 +117,7 @@ interface CopyFiles {
   readonly policies: readonly string[];
   readonly instructions: readonly string[];
   readonly outputContracts: readonly string[];
+  readonly facetPartials?: readonly string[];
   readonly instructionPartials?: readonly string[];
 }
 ```

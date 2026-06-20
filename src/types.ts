@@ -53,6 +53,7 @@ export interface CopyFiles {
   readonly policies: readonly string[];
   readonly instructions: readonly string[];
   readonly outputContracts: readonly string[];
+  readonly facetPartials?: readonly string[];
   readonly instructionPartials?: readonly string[];
 }
 

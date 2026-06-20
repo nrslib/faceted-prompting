@@ -1,7 +1,8 @@
 import { compose } from './compose.js';
 import type { ComposeDefinition, ComposedPromptPayload, ComposeOptions, CopyFiles } from './types.js';
 import { buildFacetSetFromResolvedSections, resolveDefinitionSections } from './cli/skill-renderer.js';
-import type { InstructionSection, ResolvedDefinitionSections } from './cli/skill-types.js';
+import type { InstructionSection, ResolvedDefinitionSections, SkillSection } from './cli/skill-types.js';
+import { facetPartialKindFromPath } from './facet-partial-paths.js';
 
 function instructionFacetPath(instruction: InstructionSection): string | undefined {
   if ('path' in instruction) {
@@ -10,11 +11,11 @@ function instructionFacetPath(instruction: InstructionSection): string | undefin
   return undefined;
 }
 
-function instructionPartialSourcePaths(instruction: InstructionSection): readonly string[] {
-  if (!('sourcePaths' in instruction)) {
+function partialSourcePaths(section: SkillSection | InstructionSection): readonly string[] {
+  if (!('path' in section) || !section.sourcePaths) {
     return [];
   }
-  return instruction.sourcePaths.filter(path => path !== instruction.path);
+  return section.sourcePaths.filter(path => path !== section.path);
 }
 
 function dedupePaths(paths: readonly string[]): readonly string[] {
@@ -24,9 +25,13 @@ function dedupePaths(paths: readonly string[]): readonly string[] {
 }
 
 function buildCopyFiles(resolved: ResolvedDefinitionSections): CopyFiles {
-  const instructionPartials = dedupePaths(
-    resolved.instructions.flatMap(instruction => instructionPartialSourcePaths(instruction)),
-  );
+  const facetPartials = dedupePaths([
+    ...resolved.knowledge.flatMap(section => partialSourcePaths(section)),
+    ...resolved.policies.flatMap(section => partialSourcePaths(section)),
+    ...resolved.instructions.flatMap(section => partialSourcePaths(section)),
+    ...resolved.outputContracts.flatMap(section => partialSourcePaths(section)),
+  ]);
+  const instructionPartials = facetPartials.filter(path => facetPartialKindFromPath(path) === 'instructions');
 
   return {
     persona: [resolved.persona.path],
@@ -38,6 +43,7 @@ function buildCopyFiles(resolved: ResolvedDefinitionSections): CopyFiles {
         .filter(path => path !== undefined),
     ),
     outputContracts: resolved.outputContracts.map(section => section.path),
+    ...(facetPartials.length > 0 ? { facetPartials } : {}),
     ...(instructionPartials.length > 0 ? { instructionPartials } : {}),
   };
 }

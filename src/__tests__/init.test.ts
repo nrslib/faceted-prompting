@@ -52,6 +52,9 @@ describe('initializeLocalFaceted', () => {
     expect(existsSync(join(cwd, '.faceted', 'facets', 'knowledge'))).toBe(true);
     expect(existsSync(join(cwd, '.faceted', 'facets', 'policies'))).toBe(true);
     expect(existsSync(join(cwd, '.faceted', 'facets', 'partials/instructions'))).toBe(true);
+    expect(existsSync(join(cwd, '.faceted', 'facets', 'partials/policies'))).toBe(true);
+    expect(existsSync(join(cwd, '.faceted', 'facets', 'partials/knowledge'))).toBe(true);
+    expect(existsSync(join(cwd, '.faceted', 'facets', 'partials/output-contracts'))).toBe(true);
     expect(existsSync(join(cwd, '.faceted', 'facets', 'output-contracts'))).toBe(true);
     expect(existsSync(join(cwd, '.faceted', 'compositions'))).toBe(true);
     expect(existsSync(join(cwd, '.faceted', 'templates'))).toBe(true);

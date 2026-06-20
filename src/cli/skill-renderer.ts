@@ -3,16 +3,18 @@ import { dirname, join } from 'node:path';
 import { isResourcePath, resolveResourcePath } from '../resolve.js';
 import { isScopeRef, parseScopeRef, resolveScopeRef } from '../scope.js';
 import { ensurePathWithinRoots } from './path-guard.js';
-import { expandInstructionIncludes } from './instruction-includes.js';
-import { instructionPartialsDir } from '../instruction-partial-paths.js';
+import { expandFacetIncludes } from './facet-includes.js';
 import type { ComposeDefinition, FacetKind, FacetSet } from '../types.js';
 import type {
+  FileInstructionSection,
   InstructionSection,
   ResolvedDefinitionSections,
   SkillDocumentInput,
   SkillSection,
 } from './skill-types.js';
 export { hasYamlFrontmatter, renderSkillDocument, renderSkillFrontmatter } from './skill-document-renderer.js';
+
+type FileBackedSkillSection = SkillSection & { readonly sourcePaths: readonly string[] };
 
 function requireFile(path: string, label: string): string {
   if (!existsSync(path)) {
@@ -116,6 +118,44 @@ function resolveFacetsRoots(params: {
   throw new Error('Facet roots are required');
 }
 
+function expandFileBackedFacetSection(params: {
+  ref: string;
+  resolved: { body: string; path: string };
+  facetsRoots: readonly string[];
+  repertoireRoots: readonly string[];
+  allowedRoots: readonly string[];
+}): FileBackedSkillSection {
+  const expanded = expandFacetIncludes({
+    body: params.resolved.body,
+    facetsRoots: params.facetsRoots,
+    repertoireDirs: params.repertoireRoots,
+    allowedRoots: params.allowedRoots,
+  });
+
+  return {
+    ref: params.ref,
+    body: expanded.body,
+    path: params.resolved.path,
+    sourcePaths: [params.resolved.path, ...expanded.sourcePaths],
+  };
+}
+
+function expandFileBackedInstructionSection(params: {
+  ref: string;
+  resolved: { body: string; path: string };
+  facetsRoots: readonly string[];
+  repertoireRoots: readonly string[];
+  allowedRoots: readonly string[];
+}): FileInstructionSection {
+  const section = expandFileBackedFacetSection(params);
+  return {
+    ref: section.ref,
+    body: section.body,
+    path: section.path,
+    sourcePaths: section.sourcePaths,
+  };
+}
+
 export function resolveDefinitionSections(params: {
   definition: ComposeDefinition;
   definitionDir: string;
@@ -128,11 +168,11 @@ export function resolveDefinitionSections(params: {
   const facetAllowedRoots = facetsRoots;
   const resourceAllowedRoots = [definitionDir, ...facetsRoots];
   const repertoireRoots = params.facetedRoots?.map(facetedRoot => join(facetedRoot, 'repertoire')) ?? [];
-  const instructionIncludeRepertoireRoots =
+  const includeRepertoireRoots =
     repertoireRoots.length > 0
       ? repertoireRoots
       : facetsRoots.map(facetsRoot => join(dirname(facetsRoot), 'repertoire'));
-  const includeAllowedRoots = [...facetsRoots, ...instructionIncludeRepertoireRoots];
+  const includeAllowedRoots = [...facetsRoots, ...includeRepertoireRoots];
 
   const personaContent = resolveFacetRefContent({
     ref: definition.persona,
@@ -157,7 +197,13 @@ export function resolveDefinitionSections(params: {
         repertoireRoots,
         scopeFacetKind: 'policies',
       });
-      return { ref, body: resolved.body, path: resolved.path };
+      return expandFileBackedFacetSection({
+        ref,
+        resolved,
+        facetsRoots,
+        repertoireRoots: includeRepertoireRoots,
+        allowedRoots: includeAllowedRoots,
+      });
     }) ?? [];
 
   const knowledge: SkillSection[] =
@@ -172,11 +218,17 @@ export function resolveDefinitionSections(params: {
         repertoireRoots,
         scopeFacetKind: 'knowledge',
       });
-      return { ref, body: resolved.body, path: resolved.path };
+      return expandFileBackedFacetSection({
+        ref,
+        resolved,
+        facetsRoots,
+        repertoireRoots: includeRepertoireRoots,
+        allowedRoots: includeAllowedRoots,
+      });
     }) ?? [];
 
   const instructions: InstructionSection[] =
-    definition.instructions?.map(ref => {
+    definition.instructions?.map((ref): InstructionSection => {
       const resolved = resolveOptionalFacetRefContent({
         ref,
         label: `instruction facet "${ref}"`,
@@ -192,19 +244,13 @@ export function resolveDefinitionSections(params: {
         return { ref: 'literal', body: ref };
       }
 
-      const expanded = expandInstructionIncludes({
-        body: resolved.body,
-        partialDirs: facetsRoots.map(facetsRoot => instructionPartialsDir(facetsRoot)),
-        repertoireDirs: instructionIncludeRepertoireRoots,
+      return expandFileBackedInstructionSection({
+        ref,
+        resolved,
+        facetsRoots,
+        repertoireRoots: includeRepertoireRoots,
         allowedRoots: includeAllowedRoots,
       });
-
-      return {
-        ref,
-        body: expanded.body,
-        path: resolved.path,
-        sourcePaths: [resolved.path, ...expanded.sourcePaths],
-      };
     }) ?? [];
 
   const outputContracts: SkillSection[] =
@@ -219,7 +265,13 @@ export function resolveDefinitionSections(params: {
         repertoireRoots,
         scopeFacetKind: 'output-contracts',
       });
-      return { ref, body: resolved.body, path: resolved.path };
+      return expandFileBackedFacetSection({
+        ref,
+        resolved,
+        facetsRoots,
+        repertoireRoots: includeRepertoireRoots,
+        allowedRoots: includeAllowedRoots,
+      });
     }) ?? [];
 
   return {
