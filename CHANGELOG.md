@@ -4,6 +4,19 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-06-29
+
+### Changed
+- facet include（`{{include:...}}`）を instruction 限定から全ファセット共通機能に拡張。`instructions` に加えて `policies`、`knowledge`、`output-contracts` のファイルベースファセットでも `{{include:<kind>/<name>}}` 構文で共有パーシャルを展開できるようになった (#39)
+- `composePromptPayload()` の `copyFiles` に `facetPartials` プロパティを追加。全ファセット種別のパーシャルパスを一括で取得可能に。既存の `instructionPartials` は後方互換のため維持 (#39)
+- パーシャルのディレクトリ構造を `facets/partials/<kind>/` に統一。`facets/partials/instructions/` に加えて `policies/`、`knowledge/`、`output-contracts/` サブディレクトリが追加された (#39)
+
+### Internal
+- `instruction-includes.ts` を `facet-includes.ts` にリネーム・汎化し、ファセット種別を問わず include を展開するように変更
+- `instruction-partial-paths.ts` を `facet-partial-paths.ts` にリネーム・汎化
+- `instruction-partial-copy.ts` を `facet-partial-copy.ts` にリネーム・汎化
+- skill-renderer の facet セクション解決ロジックをヘルパー関数 `expandFileBackedFacetSection` に統一
+
 ## [0.5.0] - 2026-06-19
 
 ### Added
