@@ -12,6 +12,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
+    },
+    "./cli/facet-includes": {
+      "types": "./dist/cli/facet-includes.d.ts",
+      "import": "./dist/cli/facet-includes.js"
     }
   },
   "files": [
