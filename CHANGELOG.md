@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-06-29
+
+### Fixed
+- `cli/facet-includes` モジュールが package.json の `exports` に含まれておらず、外部パッケージから `faceted-prompting/cli/facet-includes` をインポートできなかった問題を修正 (#42)
+
+### Internal
+- `.DS_Store` を `.gitignore` に追加
+
 ## [0.6.0] - 2026-06-29
 
 ### Changed
