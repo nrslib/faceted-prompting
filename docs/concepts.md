@@ -121,7 +121,7 @@ const result = compose(
 );
 ```
 
-Multiple policies or knowledge entries are joined with `---` separators. When content exceeds `contextMaxChars`, it is truncated and annotated with a source path so the LLM can consult the original file.
+Multiple policies or knowledge entries are joined with `---` separators. When content exceeds `contextMaxChars`, it is truncated and marked with `...TRUNCATED...`.
 
 ## Facets as Files
 
@@ -222,13 +222,7 @@ This enables sharing and reusing facets across teams and projects.
 
 ## Truncation
 
-When knowledge or policy content exceeds the configured `contextMaxChars`, the library truncates the content and appends metadata:
-
-- A `...TRUNCATED...` marker at the truncation point
-- A notice instructing the LLM to consult the source file
-- The source file path for reference
-
-This ensures the LLM knows when context is incomplete and where to find the full content.
+When knowledge or policy content exceeds the configured `contextMaxChars`, the library truncates the content and appends `...TRUNCATED...`. A single knowledge or policy facet also includes its source path when available.
 
 ## Template Engine
 

@@ -205,15 +205,11 @@ function trimContextContent(content: string, maxChars: number): {
 
 ### `prepareKnowledgeContent(content, maxChars, sourcePath?)`
 
-Prepares knowledge content for prompt inclusion. Adds truncation notice and source path metadata.
+Truncates knowledge content to the specified limit and appends the source path when provided.
 
 ### `preparePolicyContent(content, maxChars, sourcePath?)`
 
-Prepares policy content for prompt inclusion. Adds authoritative-source notice when truncated.
-
-### `renderConflictNotice()`
-
-Returns the standard notice: "If prompt content conflicts with source files, source files take precedence."
+Truncates policy content to the specified limit and appends the source path when provided.
 
 ## Template
 
