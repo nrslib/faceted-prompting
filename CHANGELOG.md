@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-11-27
+
+### Changed
+- プロンプト合成時にソースファイルを優先する定型文と、切り詰め時に元ファイルの参照を求める指示文を自動追加しないように変更 (#44)
+- 生成する `SKILL.md` から手動編集を禁止するコメントを削除 (#44)
+
+### Removed
+- **BREAKING:** 定型文を返す公開 API `renderConflictNotice()` を削除 (#44)
+
 ## [0.6.1] - 2026-06-29
 
 ### Fixed
