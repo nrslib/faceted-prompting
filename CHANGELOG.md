@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-27
+
+### Added
+- `facet compose --no-source-paths` で、自動生成される `Knowledge Source` と `Policy Source` の行を省略できるように変更。`--combined` と併用すると1ファイルに出力できる (#46)
+- TypeScript API の `ComposeOptions.includeSourcePaths` を追加。`false` を指定すると合成結果の出典行を省略できる (#46)
+
 ## [0.7.0] - 2026-11-27
 
 ### Changed
