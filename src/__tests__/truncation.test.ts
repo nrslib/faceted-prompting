@@ -5,7 +5,6 @@
 import { describe, it, expect } from 'vitest';
 import {
   trimContextContent,
-  renderConflictNotice,
   prepareKnowledgeContent,
   preparePolicyContent,
 } from '../index.js';
@@ -32,69 +31,50 @@ describe('trimContextContent', () => {
   });
 });
 
-describe('renderConflictNotice', () => {
-  it('should return the standard conflict notice', () => {
-    const notice = renderConflictNotice();
-    expect(notice).toBe('If prompt content conflicts with source files, source files take precedence.');
-  });
-});
-
 describe('prepareKnowledgeContent', () => {
-  it('should append conflict notice without sourcePath', () => {
+  it('should return the original content without sourcePath', () => {
     const result = prepareKnowledgeContent('knowledge text', 2000);
-    expect(result).toContain('knowledge text');
-    expect(result).toContain('If prompt content conflicts with source files');
-    expect(result).not.toContain('Knowledge Source:');
+    expect(result).toBe('knowledge text');
   });
 
   it('should append source path when provided', () => {
     const result = prepareKnowledgeContent('knowledge text', 2000, '/path/to/knowledge.md');
-    expect(result).toContain('Knowledge Source: /path/to/knowledge.md');
-    expect(result).toContain('If prompt content conflicts with source files');
+    expect(result).toBe('knowledge text\n\nKnowledge Source: /path/to/knowledge.md');
   });
 
-  it('should append truncation notice when truncated with sourcePath', () => {
+  it('should append the truncation marker and source path', () => {
     const longContent = 'x'.repeat(3000);
     const result = prepareKnowledgeContent(longContent, 2000, '/path/to/knowledge.md');
-    expect(result).toContain('...TRUNCATED...');
-    expect(result).toContain('Knowledge is truncated. You MUST consult the source files before making decisions.');
-    expect(result).toContain('Knowledge Source: /path/to/knowledge.md');
+    expect(result).toBe(`${longContent.slice(0, 2000)}\n...TRUNCATED...\n\nKnowledge Source: /path/to/knowledge.md`);
   });
 
-  it('should not include truncation notice when truncated without sourcePath', () => {
+  it('should append only the truncation marker without sourcePath', () => {
     const longContent = 'x'.repeat(3000);
     const result = prepareKnowledgeContent(longContent, 2000);
-    expect(result).toContain('...TRUNCATED...');
-    expect(result).not.toContain('Knowledge is truncated');
+    expect(result).toBe(`${longContent.slice(0, 2000)}\n...TRUNCATED...`);
   });
 });
 
 describe('preparePolicyContent', () => {
-  it('should append conflict notice without sourcePath', () => {
+  it('should return the original content without sourcePath', () => {
     const result = preparePolicyContent('policy text', 2000);
-    expect(result).toContain('policy text');
-    expect(result).toContain('If prompt content conflicts with source files');
-    expect(result).not.toContain('Policy Source:');
+    expect(result).toBe('policy text');
   });
 
   it('should append source path when provided', () => {
     const result = preparePolicyContent('policy text', 2000, '/path/to/policy.md');
-    expect(result).toContain('Policy Source: /path/to/policy.md');
-    expect(result).toContain('If prompt content conflicts with source files');
+    expect(result).toBe('policy text\n\nPolicy Source: /path/to/policy.md');
   });
 
-  it('should append authoritative notice when truncated with sourcePath', () => {
+  it('should append the truncation marker and source path', () => {
     const longContent = 'y'.repeat(3000);
     const result = preparePolicyContent(longContent, 2000, '/path/to/policy.md');
-    expect(result).toContain('...TRUNCATED...');
-    expect(result).toContain('Policy is authoritative. If truncated, you MUST read the full policy file and follow it strictly.');
-    expect(result).toContain('Policy Source: /path/to/policy.md');
+    expect(result).toBe(`${longContent.slice(0, 2000)}\n...TRUNCATED...\n\nPolicy Source: /path/to/policy.md`);
   });
 
-  it('should not include authoritative notice when truncated without sourcePath', () => {
+  it('should append only the truncation marker without sourcePath', () => {
     const longContent = 'y'.repeat(3000);
     const result = preparePolicyContent(longContent, 2000);
-    expect(result).toContain('...TRUNCATED...');
-    expect(result).not.toContain('Policy is authoritative');
+    expect(result).toBe(`${longContent.slice(0, 2000)}\n...TRUNCATED...`);
   });
 });

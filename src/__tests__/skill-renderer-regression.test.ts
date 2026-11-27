@@ -32,7 +32,7 @@ describe('skill renderer regression', () => {
       policies: [{ ref: 'coding', body: 'Policy body', path: '/facets/policies/coding.md' }],
     });
 
-    expect(rendered).toContain('## Output Contracts');
+    expect(rendered).toMatch(/^---\nname: coding\n---\n\n## Persona\n/u);
     expect(rendered.indexOf('## Knowledge')).toBeLessThan(rendered.indexOf('## Instructions'));
     expect(rendered.indexOf('## Instructions')).toBeLessThan(rendered.indexOf('## Output Contracts'));
     expect(rendered.indexOf('## Output Contracts')).toBeLessThan(rendered.indexOf('## Policies'));

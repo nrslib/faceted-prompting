@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { extname, relative, resolve, sep } from 'node:path';
-import { renderConflictNotice, trimContextContent } from '../truncation.js';
+import { trimContextContent } from '../truncation.js';
 
 const CONTEXT_MAX_CHARS = 2000;
 const MAX_FALLBACK_FILES = 12;
@@ -191,8 +191,6 @@ function renderRelatedFileBlock(cwd: string, relativePath: string): string | und
     prepared.content,
     '',
     `Source: ${relativePath}`,
-    '',
-    renderConflictNotice(),
   ];
   return lines.join('\n');
 }

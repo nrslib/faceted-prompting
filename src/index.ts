@@ -29,7 +29,6 @@ export { FileDataEngine, CompositeDataEngine } from './data-engine.js';
 // Truncation
 export {
   trimContextContent,
-  renderConflictNotice,
   prepareKnowledgeContent,
   preparePolicyContent,
 } from './truncation.js';

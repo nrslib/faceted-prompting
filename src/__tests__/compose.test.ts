@@ -44,7 +44,7 @@ describe('compose', () => {
     expect(result.userMessage).toBe('Review the plan.\n\nImplement the change.');
   });
 
-  it('should place policy in userMessage with conflict notice', () => {
+  it('should place policy in userMessage', () => {
     const facets: FacetSet = {
       policies: [{ body: 'Follow clean code principles.' }],
     };
@@ -52,11 +52,10 @@ describe('compose', () => {
     const result = compose(facets, defaultOptions);
 
     expect(result.systemPrompt).toBe('');
-    expect(result.userMessage).toContain('Follow clean code principles.');
-    expect(result.userMessage).toContain('If prompt content conflicts with source files');
+    expect(result.userMessage).toBe('Follow clean code principles.');
   });
 
-  it('should place knowledge in userMessage with conflict notice', () => {
+  it('should place knowledge in userMessage', () => {
     const facets: FacetSet = {
       knowledge: [{ body: 'Architecture documentation.' }],
     };
@@ -64,11 +63,10 @@ describe('compose', () => {
     const result = compose(facets, defaultOptions);
 
     expect(result.systemPrompt).toBe('');
-    expect(result.userMessage).toContain('Architecture documentation.');
-    expect(result.userMessage).toContain('If prompt content conflicts with source files');
+    expect(result.userMessage).toBe('Architecture documentation.');
   });
 
-  it('should place output contracts in userMessage without conflict notice', () => {
+  it('should place output contracts in userMessage', () => {
     const facets: FacetSet = {
       outputContracts: [{ body: 'Return a markdown report.' }],
     };
@@ -77,7 +75,6 @@ describe('compose', () => {
 
     expect(result.systemPrompt).toBe('');
     expect(result.userMessage).toBe('Return a markdown report.');
-    expect(result.userMessage).not.toContain('If prompt content conflicts with source files');
   });
 
   it('should compose all facets in correct order: knowledge, instructions, output contracts, policies', () => {
@@ -164,8 +161,7 @@ describe('compose', () => {
 
     const result = compose(facets, { contextMaxChars: 2000 });
 
-    expect(result.userMessage).toContain('...TRUNCATED...');
-    expect(result.userMessage).toContain('Policy is authoritative');
+    expect(result.userMessage).toBe(`${longPolicy.slice(0, 2000)}\n...TRUNCATED...\n\nPolicy Source: /path/policy.md`);
   });
 
   it('should truncate knowledge content exceeding contextMaxChars', () => {
@@ -176,8 +172,7 @@ describe('compose', () => {
 
     const result = compose(facets, { contextMaxChars: 2000 });
 
-    expect(result.userMessage).toContain('...TRUNCATED...');
-    expect(result.userMessage).toContain('Knowledge is truncated');
+    expect(result.userMessage).toBe(`${longKnowledge.slice(0, 2000)}\n...TRUNCATED...\n\nKnowledge Source: /path/knowledge.md`);
   });
 
   it('should handle empty facet set', () => {
@@ -194,7 +189,7 @@ describe('compose', () => {
 
     const result = compose(facets, defaultOptions);
 
-    expect(result.userMessage).toContain('Policy Source: /policies/coding.md');
+    expect(result.userMessage).toBe('Policy text\n\nPolicy Source: /policies/coding.md');
   });
 
   it('should include source path for single knowledge', () => {
@@ -204,6 +199,6 @@ describe('compose', () => {
 
     const result = compose(facets, defaultOptions);
 
-    expect(result.userMessage).toContain('Knowledge Source: /knowledge/arch.md');
+    expect(result.userMessage).toBe('Knowledge text\n\nKnowledge Source: /knowledge/arch.md');
   });
 });
