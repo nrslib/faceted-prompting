@@ -10,6 +10,7 @@ export interface ComposeCliOptions {
   readonly outputMode?: 'split' | 'combined';
   readonly output?: string;
   readonly overwrite?: boolean;
+  readonly includeSourcePaths?: boolean;
 }
 
 export type FacetCliResult =

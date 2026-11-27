@@ -16,11 +16,12 @@ function renderOrderedUserPart(
   entry: ComposeOrderEntry,
   facets: FacetSet,
   contextMaxChars: number,
+  includeSourcePaths: boolean,
 ): readonly string[] {
   if (entry === 'policies') {
     if (!facets.policies || facets.policies.length === 0) return [];
     const joined = facets.policies.map(p => p.body).join('\n\n---\n\n');
-    const sourcePath = facets.policies.length === 1
+    const sourcePath = includeSourcePaths && facets.policies.length === 1
       ? facets.policies[0]!.sourcePath
       : undefined;
     return [preparePolicyContent(joined, contextMaxChars, sourcePath)];
@@ -29,7 +30,7 @@ function renderOrderedUserPart(
   if (entry === 'knowledge') {
     if (!facets.knowledge || facets.knowledge.length === 0) return [];
     const joined = facets.knowledge.map(k => k.body).join('\n\n---\n\n');
-    const sourcePath = facets.knowledge.length === 1
+    const sourcePath = includeSourcePaths && facets.knowledge.length === 1
       ? facets.knowledge[0]!.sourcePath
       : undefined;
     return [prepareKnowledgeContent(joined, contextMaxChars, sourcePath)];
@@ -53,9 +54,12 @@ function renderOrderedUserPart(
  * the model sees before generating output.
  */
 export function compose(facets: FacetSet, options: ComposeOptions): ComposedPrompt {
+  const { contextMaxChars, includeSourcePaths = true } = options;
   const systemPrompt = facets.persona?.body ?? '';
   const order = options.userMessageOrder ?? DEFAULT_USER_MESSAGE_ORDER;
-  const userParts = order.flatMap(entry => renderOrderedUserPart(entry, facets, options.contextMaxChars));
+  const userParts = order.flatMap(entry =>
+    renderOrderedUserPart(entry, facets, contextMaxChars, includeSourcePaths),
+  );
 
   return {
     systemPrompt,

@@ -131,21 +131,28 @@ describe('composePromptPayload', () => {
     writeFileSync(instructionPath, 'Implement the requested change.', 'utf-8');
     writeFileSync(outputContractPath, 'Write the report with Findings first.', 'utf-8');
 
-    const payload = composePromptPayload({
-      definition: {
-        name: 'coding',
-        persona: 'coder',
-        knowledge: ['architecture'],
-        policies: ['coding'],
-        instructions: ['task'],
-        outputContracts: ['report'],
-        order: ['policies', 'knowledge', 'instructions', 'output-contracts'],
-      },
+    const definition: ComposeDefinition = {
+      name: 'coding',
+      persona: 'coder',
+      knowledge: ['architecture'],
+      policies: ['coding'],
+      instructions: ['task'],
+      outputContracts: ['report'],
+      order: ['policies', 'knowledge', 'instructions', 'output-contracts'],
+    };
+    const payloadParams = {
+      definition,
       definitionDir: rootDir,
       facetsRoot,
       composeOptions: {
         contextMaxChars: 8000,
       },
+    };
+
+    const payload = composePromptPayload(payloadParams);
+    const withoutSourcePaths = composePromptPayload({
+      ...payloadParams,
+      composeOptions: { ...payloadParams.composeOptions, includeSourcePaths: false },
     });
 
     expect(payload.systemPrompt).toContain('You are a coding agent.');
@@ -159,6 +166,16 @@ describe('composePromptPayload', () => {
       policies: [realpathSync(policyPath)],
       instructions: [realpathSync(instructionPath)],
       outputContracts: [realpathSync(outputContractPath)],
+    });
+    expect(withoutSourcePaths).toEqual({
+      systemPrompt: payload.systemPrompt,
+      userPrompt: [
+        'Never hide errors.',
+        'Architecture reference.',
+        'Implement the requested change.',
+        'Write the report with Findings first.',
+      ].join('\n\n'),
+      copyFiles: payload.copyFiles,
     });
   });
 

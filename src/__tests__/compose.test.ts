@@ -201,4 +201,22 @@ describe('compose', () => {
 
     expect(result.userMessage).toBe('Knowledge text\n\nKnowledge Source: /knowledge/arch.md');
   });
+
+  it('should omit generated source paths while retaining source lines in the facet body', () => {
+    const policy = 'Knowledge Source: example-knowledge.md\nPolicy Source: example-policy.md';
+    const knowledge = 'Architecture reference. '.repeat(5);
+    const contextMaxChars = policy.length;
+    const facets: FacetSet = {
+      knowledge: [{ body: knowledge, sourcePath: '/knowledge/arch.md' }],
+      policies: [{ body: policy, sourcePath: '/policies/coding.md' }],
+    };
+
+    const result = compose(facets, {
+      contextMaxChars,
+      includeSourcePaths: false,
+      userMessageOrder: ['policies', 'knowledge'],
+    });
+
+    expect(result.userMessage).toBe(`${policy}\n\n${knowledge.slice(0, contextMaxChars)}\n...TRUNCATED...`);
+  });
 });

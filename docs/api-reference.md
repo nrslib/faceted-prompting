@@ -23,6 +23,7 @@ function compose(facets: FacetSet, options: ComposeOptions): ComposedPrompt;
 
 - `facets` — A `FacetSet` containing resolved facet contents
 - `options.contextMaxChars` — Maximum character length for knowledge/policy content before truncation
+- `options.includeSourcePaths` — Set to `false` to omit generated `Knowledge Source` and `Policy Source` lines. Defaults to `true`.
 - `options.userMessageOrder` — Optional section order (default: `['knowledge', 'instructions', 'output-contracts', 'policies']`)
 
 **Returns:** `ComposedPrompt` with `systemPrompt` and `userMessage` strings.
@@ -49,7 +50,7 @@ function composePromptPayload(params: {
 - `params.facetsRoot` — Single facets root, for callers that only use one root
 - `params.facetsRoots` — Ordered facets roots for first-match facet name resolution
 - `params.facetedRoots` — Ordered `.faceted` roots used to resolve repertoire scope references such as `@owner/repo/facet-name`
-- `params.composeOptions` — Composition options passed to `compose`
+- `params.composeOptions` — Composition options passed to `compose`. Set `includeSourcePaths` to `false` to hide generated source paths in `userPrompt` while retaining them in `copyFiles`.
 
 At least one facet root is required through `facetsRoot` or a non-empty `facetsRoots`.
 Regular facet scope references require `facetedRoots`; calling this API with a scope reference and no repertoire roots fails with an error instead of falling back to a local facet name. Facet partial includes can also resolve copied repertoire partials inferred from the parent directories of the configured facets roots.
@@ -127,6 +128,7 @@ interface CopyFiles {
 ```typescript
 interface ComposeOptions {
   readonly contextMaxChars: number;
+  readonly includeSourcePaths?: boolean;
   readonly userMessageOrder?: readonly ComposeOrderEntry[];
 }
 ```

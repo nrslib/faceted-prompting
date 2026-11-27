@@ -90,6 +90,8 @@ export interface ComposeDefinition {
 export interface ComposeOptions {
   /** Maximum character length for knowledge/policy content before truncation. */
   readonly contextMaxChars: number;
+  /** Include source paths in knowledge and policy text when available. Defaults to true. */
+  readonly includeSourcePaths?: boolean;
   /** Optional user-message section order for knowledge/instructions/output-contracts/policies. */
   readonly userMessageOrder?: readonly ComposeOrderEntry[];
 }

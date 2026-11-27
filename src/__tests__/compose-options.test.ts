@@ -13,6 +13,7 @@ describe('parseComposeOptions', () => {
       '--output',
       './out',
       '--overwrite',
+      '--no-source-paths',
     ]);
 
     expect(options).toEqual({
@@ -20,6 +21,7 @@ describe('parseComposeOptions', () => {
       outputMode: 'combined',
       output: './out',
       overwrite: true,
+      includeSourcePaths: false,
     });
   });
 
@@ -82,5 +84,9 @@ describe('isNonInteractiveMode', () => {
 
   it('should return false when no compose options are provided', () => {
     expect(isNonInteractiveMode({})).toBe(false);
+  });
+
+  it('should stay interactive when only source paths are disabled', () => {
+    expect(isNonInteractiveMode(parseComposeOptions(['--no-source-paths']))).toBe(false);
   });
 });

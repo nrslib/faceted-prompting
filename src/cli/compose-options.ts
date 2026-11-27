@@ -17,6 +17,7 @@ export function parseComposeOptions(args: readonly string[]): ComposeCliOptions 
   let outputMode: ComposeCliOptions['outputMode'];
   let output: string | undefined;
   let overwrite = false;
+  let includeSourcePaths: boolean | undefined;
 
   for (let index = 0; index < args.length; index += 1) {
     const arg = args[index];
@@ -57,6 +58,11 @@ export function parseComposeOptions(args: readonly string[]): ComposeCliOptions 
       continue;
     }
 
+    if (arg === '--no-source-paths') {
+      includeSourcePaths = false;
+      continue;
+    }
+
     if (arg.startsWith('--')) {
       throw new Error(`Unsupported compose option: ${arg}`);
     }
@@ -69,6 +75,7 @@ export function parseComposeOptions(args: readonly string[]): ComposeCliOptions 
     outputMode,
     output,
     overwrite: overwrite || undefined,
+    includeSourcePaths,
   };
 }
 
