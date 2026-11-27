@@ -173,6 +173,7 @@ export async function runStandardCompose(params: {
   });
   const composed = compose(facetSet, {
     contextMaxChars: 2000,
+    includeSourcePaths: params.composeOptions.includeSourcePaths,
     userMessageOrder: params.definition.order,
   });
 

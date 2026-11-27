@@ -1,8 +1,8 @@
-import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 type CliModule = {
   runFacetCli: (args: string[], options: {
@@ -367,9 +367,60 @@ describe('facet compose integration flow', () => {
       throw new Error('Expected path result for combined compose command');
     }
     expect(result.path).toBe(join(workspaceDir, 'coding.md'));
-    expect(readFileSync(result.path, 'utf-8')).toContain('You are a release engineer.');
-    expect(readFileSync(result.path, 'utf-8')).toContain('Architecture reference.');
-    expect(readFileSync(result.path, 'utf-8')).toContain('Never hide errors.');
+    const generated = readFileSync(result.path, 'utf-8');
+    expect(generated).toContain('You are a release engineer.');
+    expect(generated).toContain('Architecture reference.');
+    expect(generated).toContain('Knowledge Source: ');
+    expect(generated).toContain('Never hide errors.');
+  });
+
+  it.each(['combined', 'split', 'interactive'])('should omit generated source paths in %s output', async mode => {
+    const workspaceDir = mkdtempSync(join(tmpdir(), 'facet-workspace-'));
+    const homeDir = mkdtempSync(join(tmpdir(), 'facet-home-'));
+    tempDirs.push(workspaceDir, homeDir);
+
+    writeDefaultFacetFixture(homeDir, 'You are a release engineer.\n');
+    writeFileSync(
+      join(homeDir, '.faceted', 'compositions', 'coding.yaml'),
+      'name: coding\npersona: coder\nknowledge: [architecture]\npolicies: [coding]\n',
+      'utf-8',
+    );
+
+    const interactive = mode === 'interactive';
+    const args = interactive
+      ? ['compose', '--no-source-paths']
+      : ['compose', '--composition', 'coding', `--${mode}`, '--no-source-paths'];
+    const select = interactive
+      ? vi.fn(createSelectStub(['coding (global)', 'Combined (single file)']))
+      : unexpectedSelect;
+    const { runFacetCli } = await loadCliModule();
+    const result = await runFacetCli(args, {
+      cwd: workspaceDir,
+      homeDir,
+      select,
+      input: interactive ? async (_prompt, defaultValue) => defaultValue : unexpectedInput,
+    });
+
+    if (interactive) {
+      expect(select).toHaveBeenCalledTimes(2);
+    }
+
+    if (mode === 'split') {
+      const systemPath = join(workspaceDir, 'coding.system.md');
+      const userPath = join(workspaceDir, 'coding.user.md');
+      expect(result).toEqual({ kind: 'paths', paths: [systemPath, userPath] });
+      expect(readdirSync(workspaceDir).sort()).toEqual(['coding.system.md', 'coding.user.md']);
+      expect(readFileSync(systemPath, 'utf-8')).toBe('You are a release engineer.\n\n');
+      expect(readFileSync(userPath, 'utf-8')).toBe('Architecture reference.\n\n\nNever hide errors.\n\n');
+      return;
+    }
+
+    const outputPath = join(workspaceDir, 'coding.md');
+    expect(result).toEqual({ kind: 'path', path: outputPath });
+    expect(readdirSync(workspaceDir)).toEqual(['coding.md']);
+    expect(readFileSync(outputPath, 'utf-8')).toBe(
+      'You are a release engineer.\n\n\nArchitecture reference.\n\n\nNever hide errors.\n\n',
+    );
   });
 
   it('should overwrite existing standard output file non-interactively when overwrite is enabled', async () => {

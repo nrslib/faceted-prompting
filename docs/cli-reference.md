@@ -69,7 +69,7 @@ The compose context always includes the `coder` persona, `coding` and `ai-antipa
 
 **Non-interactive mode:**
 
-When any of the following options are specified, compose runs without prompts:
+For standard (non-template) compose, provide a composition name and output mode to compose without prompts:
 
 ```bash
 facet compose --composition <name> --split --output ./out --overwrite
@@ -82,8 +82,17 @@ facet compose --composition <name> --split --output ./out --overwrite
 | `--combined` | Output as a single combined file |
 | `--output <dir>` | Output directory (default: current working directory) |
 | `--overwrite` | Overwrite existing files without confirmation |
+| `--no-source-paths` | Omit generated `Knowledge Source` and `Policy Source` lines from standard compose output |
 
 `--split` and `--combined` are mutually exclusive. For standard (non-template) compose, one of them is required in non-interactive mode. Template-backed compose does not support `--split` or `--combined`.
+
+To write a single prompt file with source paths hidden:
+
+```bash
+facet compose --composition <name> --combined --no-source-paths
+```
+
+`facet compose --no-source-paths` uses the interactive composition and output selection.
 
 ### `facet install skill`
 
